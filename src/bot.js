@@ -566,7 +566,15 @@ bot.on('message', async (msg) => {
 // -----------------------------------------------------------------
 // Background OTP Polling mechanism
 // -----------------------------------------------------------------
+let isOtpPolling = false;
+
 setInterval(async () => {
+  // Prevent overlapping poll cycles — if the previous poll is still running
+  // (e.g. slow API response), skip this cycle to avoid sending duplicate OTPs.
+  if (isOtpPolling) return;
+  isOtpPolling = true;
+
+  try {
   let pendingKeys = Object.keys(pendingNumbers);
 
   // If there are no pending numbers, don't spam the API
@@ -789,6 +797,9 @@ setInterval(async () => {
     }
   }
 
+  } finally {
+    isOtpPolling = false;
+  }
 }, 2000); // 2 seconds polling
 
 // -----------------------------------------------------------------
