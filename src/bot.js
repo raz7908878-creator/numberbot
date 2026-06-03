@@ -138,7 +138,7 @@ bot.onText(/\/start/, async (msg) => {
     }
   }
 
-  keyboard.push([{ text: '🔢 Enter Custom Range', callback_data: 'custom_range' }]);
+  keyboard.push([{ text: '📊 Active Range', url: 'https://t.me/+E_M7TqggqpZjZTNl' }]);
 
   const welcome = ranges.length > 0
     ? `Welcome to the *SRF Number Bot!*\n\n💰 *Your Balance:* \`${balance}\` points\n\nSelect a range below or type a range directly:`
@@ -792,7 +792,14 @@ setInterval(async () => {
         try { await bot.deleteMessage(reqData.chatId, reqData.successMsgId); } catch (e) { /* ignore */ }
       }
       // Notify user
-      bot.sendMessage(reqData.chatId, `⏰ *Timeout!* Number \`${pNumber}\` has been unassigned after 10 minutes with no OTP.`, { parse_mode: 'Markdown' }).catch(() => {});
+      bot.sendMessage(reqData.chatId, `⏰ *Timeout!* Number \`${pNumber}\` has been unassigned after 10 minutes with no OTP.`, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📊 Active Range', url: 'https://t.me/+E_M7TqggqpZjZTNl' }]
+          ]
+        }
+      }).catch(() => {});
       delete pendingNumbers[pNumber];
     }
   }
