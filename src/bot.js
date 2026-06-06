@@ -138,7 +138,7 @@ bot.onText(/\/start/, async (msg) => {
     }
   }
 
-  keyboard.push([{ text: '📊 Active Range', url: 'https://t.me/+E_M7TqggqpZjZTNl' }]);
+  keyboard.push([{ text: '📊 Active Range', url: 'https://t.me/srfranges' }]);
 
   const welcome = ranges.length > 0
     ? `Welcome to the *SRF Number Bot!*\n\n💰 *Your Balance:* \`${balance}\` points\n\nSelect a range below or type a range directly:`
@@ -254,10 +254,10 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
           inline_keyboard: [
             [
               { text: '🔄 Change Number', callback_data: `change_number:${range}` },
-              { text: '📊 Active Ranges', url: 'https://t.me/+E_M7TqggqpZjZTNl' }
+              { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
             ],
             [
-              { text: '📬 OTP Group', url: 'https://t.me/+y3Y4QfaD22QyZjE9' }
+              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups' }
             ]
           ]
         }
@@ -362,10 +362,10 @@ bot.on('callback_query', async (query) => {
           inline_keyboard: [
             [
               { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}` },
-              { text: '📊 Active Ranges', url: 'https://t.me/+E_M7TqggqpZjZTNl' }
+              { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
             ],
             [
-              { text: '📬 OTP Group', url: 'https://t.me/+y3Y4QfaD22QyZjE9' }
+              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups' }
             ]
           ]
         }
@@ -474,20 +474,18 @@ bot.on('callback_query', async (query) => {
       if (userIds.length === 0) {
         return bot.sendMessage(chatId, '❌ No users found. Users appear here after receiving their first OTP.').catch(() => {});
       }
-      // Fetch user info (name/username) for each user
-      const keyboard = [];
-      for (const uid of userIds) {
-        let label = uid;
-        try {
-          const chat = await bot.getChat(uid);
+      // Fetch user info (name/username) for all users in parallel
+      const userInfoResults = await Promise.allSettled(
+        userIds.map(uid => bot.getChat(uid).then(chat => {
           const name = chat.first_name || '';
           const uname = chat.username ? `@${chat.username}` : '';
-          label = uname ? `${name} (${uname})` : name || uid;
-        } catch (e) { /* fallback to uid */ }
-        keyboard.push([
-          { text: `👤 ${label}  •  💰 ${balances[uid]} pts`, callback_data: `admin_bal_user:${uid}` }
-        ]);
-      }
+          return uname ? `${name} (${uname})` : name || uid;
+        }))
+      );
+      const keyboard = userIds.map((uid, i) => {
+        const label = userInfoResults[i].status === 'fulfilled' ? userInfoResults[i].value : uid;
+        return [{ text: `👤 ${label}  •  💰 ${balances[uid]} pts`, callback_data: `admin_bal_user:${uid}` }];
+      });
       bot.sendMessage(chatId, '👥 *Select a user to edit balance:*', {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: keyboard }
@@ -655,7 +653,7 @@ setInterval(async () => {
               inline_keyboard: [
                 [
                   { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}` },
-                  { text: '📊 Active Ranges', url: 'https://t.me/+E_M7TqggqpZjZTNl' }
+                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}` }
@@ -749,7 +747,7 @@ setInterval(async () => {
               inline_keyboard: [
                 [
                   { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}` },
-                  { text: '📊 Active Ranges', url: 'https://t.me/+E_M7TqggqpZjZTNl' }
+                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}` }
@@ -796,7 +794,7 @@ setInterval(async () => {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '📊 Active Range', url: 'https://t.me/+E_M7TqggqpZjZTNl' }]
+            [{ text: '📊 Active Range', url: 'https://t.me/srfranges' }]
           ]
         }
       }).catch(() => {});
