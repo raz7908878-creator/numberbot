@@ -137,7 +137,7 @@ async function startCookieRefreshLoop() {
   await refreshCookies();
   setInterval(async () => {
     await refreshCookies();
-  }, 5 * 60 * 1000);
+  }, 1 * 60 * 1000);
 }
 
 function getAuthHeaders(referer) {

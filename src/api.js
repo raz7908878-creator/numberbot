@@ -117,16 +117,16 @@ async function refreshCookies() {
 
 /**
  * Start the background cookie refresh loop.
- * Extracts fresh cookies immediately, then every 5 minutes.
+ * Extracts fresh cookies immediately, then every 1 minute.
  */
 async function startCookieRefreshLoop() {
   // Initial extraction
   await refreshCookies();
 
-  // Refresh every 5 minutes
+  // Refresh every 1 minute
   setInterval(async () => {
     await refreshCookies();
-  }, 5 * 60 * 1000);
+  }, 1 * 60 * 1000);
 }
 
 /**
