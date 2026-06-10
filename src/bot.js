@@ -150,7 +150,7 @@ bot.onText(/\/start/, async (msg) => {
     parse_mode: 'Markdown',
     reply_markup: {
       keyboard: [
-        [{ text: '📲 Get Number' }, { text: '📡 Live Traffic' }]
+        [{ text: '🟢 📲 Get Number' }, { text: '🔵 📡 Live Traffic' }]
       ],
       resize_keyboard: true,
       one_time_keyboard: false
@@ -257,11 +257,11 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: '🔄 Change Number', callback_data: `change_number:${range}` },
-              { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
+              { text: '🔴 🔄 Change Number', callback_data: `change_number:${range}` },
+              { text: '🟢 📊 Active Ranges', url: 'https://t.me/srfranges' }
             ],
             [
-              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups' }
+              { text: '🔵 📬 OTP Group', url: 'https://t.me/srfotpgroups' }
             ]
           ]
         }
@@ -366,11 +366,11 @@ bot.on('callback_query', async (query) => {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}` },
-              { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
+              { text: '🔴 🔄 Change Number', callback_data: `change_number:${lastData.range}` },
+              { text: '🟢 📊 Active Ranges', url: 'https://t.me/srfranges' }
             ],
             [
-              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups' }
+              { text: '🔵 📬 OTP Group', url: 'https://t.me/srfotpgroups' }
             ]
           ]
         }
@@ -480,7 +480,7 @@ bot.on('message', async (msg) => {
   if (!text || text.startsWith('/')) return;
 
   // --- Reply Keyboard: Get Number ---
-  if (text === '📲 Get Number') {
+  if (text === '🟢 📲 Get Number' || text === '📲 Get Number') {
     const countries = getLiveCountries();
     if (countries.length === 0) {
       return bot.sendMessage(chatId, '😔 No live ranges available right now.\n\n_Ranges appear here automatically when new ones drop in the range group. Try again in a moment._', { parse_mode: 'Markdown' }).catch(() => {});
@@ -496,7 +496,7 @@ bot.on('message', async (msg) => {
   }
 
   // --- Reply Keyboard: Live Traffic ---
-  if (text === '📡 Live Traffic') {
+  if (text === '🔵 📡 Live Traffic' || text === '📡 Live Traffic') {
     const countries = getLiveCountries();
     if (countries.length === 0) {
       return bot.sendMessage(chatId, '📡 *Live Traffic*\n\n_No live traffic in the last 5 minutes._\n\nNew ranges will appear here automatically when they drop.', { parse_mode: 'Markdown' }).catch(() => {});
@@ -619,11 +619,11 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}` },
-                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
+                  { text: '🔴 🔄 Change Number', callback_data: `change_from_otp:${reqData.range}` },
+                  { text: '🟢 📊 Active Ranges', url: 'https://t.me/srfranges' }
                 ],
                 [
-                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}` }
+                  { text: '🔵 🔁 Restore Last Number', callback_data: `restore_last:${pNumber}` }
                 ]
               ]
             }
@@ -713,11 +713,11 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}` },
-                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges' }
+                  { text: '🔴 🔄 Change Number', callback_data: `change_from_otp:${reqData.range}` },
+                  { text: '🟢 📊 Active Ranges', url: 'https://t.me/srfranges' }
                 ],
                 [
-                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}` }
+                  { text: '🔵 🔁 Restore Last Number', callback_data: `restore_last:${pNumber}` }
                 ]
               ]
             }
