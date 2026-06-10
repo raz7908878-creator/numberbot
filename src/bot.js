@@ -593,7 +593,24 @@ setInterval(async () => {
           // Extract only NEW OTPs (skip previously seen ones)
           const allOtps = record.otps.split('|||');
           const allSms = (record.full_sms_list || record.otps).split('|||');
-          const newOtps = allOtps.slice(knownCount).join('|||');
+          
+          const newOtpsArr = allOtps.slice(knownCount).map((otp, index) => {
+            const sms = allSms.slice(knownCount)[index] || otp;
+            let cleanedOtp = otp.trim();
+            // Smart extraction: If API returned words (e.g. "votre") instead of digits
+            if (/[a-zA-Z]/.test(cleanedOtp) || cleanedOtp.length < 4) {
+              const match = sms.match(/(?:\b|\D)(\d{3})\s*(\d{3})(?:\b|\D)/);
+              if (match) {
+                cleanedOtp = match[1] + match[2];
+              } else {
+                const digitsMatch = sms.match(/\d{4,8}/);
+                if (digitsMatch) cleanedOtp = digitsMatch[0];
+              }
+            }
+            return cleanedOtp;
+          });
+          
+          const newOtps = newOtpsArr.join('|||');
           const newSms = allSms.slice(knownCount).join('|||');
 
           // Award 0.25 points per OTP received
@@ -633,10 +650,8 @@ setInterval(async () => {
           if (OTP_GROUP_ID) {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
-            const safeSms = newSms.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>📝 SMS: ${safeSms}</blockquote>`;
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
-              parse_mode: 'HTML',
               reply_markup: {
                 inline_keyboard: [
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
@@ -699,7 +714,24 @@ setInterval(async () => {
           // Extract only NEW OTPs (skip previously seen ones)
           const allOtps = record.otps.split('|||');
           const allSms = (record.full_sms_list || record.otps).split('|||');
-          const newOtps = allOtps.slice(knownCount).join('|||');
+          
+          const newOtpsArr = allOtps.slice(knownCount).map((otp, index) => {
+            const sms = allSms.slice(knownCount)[index] || otp;
+            let cleanedOtp = otp.trim();
+            // Smart extraction: If API returned words (e.g. "votre") instead of digits
+            if (/[a-zA-Z]/.test(cleanedOtp) || cleanedOtp.length < 4) {
+              const match = sms.match(/(?:\b|\D)(\d{3})\s*(\d{3})(?:\b|\D)/);
+              if (match) {
+                cleanedOtp = match[1] + match[2];
+              } else {
+                const digitsMatch = sms.match(/\d{4,8}/);
+                if (digitsMatch) cleanedOtp = digitsMatch[0];
+              }
+            }
+            return cleanedOtp;
+          });
+          
+          const newOtps = newOtpsArr.join('|||');
           const newSms = allSms.slice(knownCount).join('|||');
 
           // Award 0.25 points per OTP received
@@ -739,10 +771,8 @@ setInterval(async () => {
           if (OTP_GROUP_ID) {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
-            const safeSms = newSms.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>📝 SMS: ${safeSms}</blockquote>`;
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
-              parse_mode: 'HTML',
               reply_markup: {
                 inline_keyboard: [
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
