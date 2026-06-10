@@ -95,22 +95,41 @@ function isoToFlag(iso) {
 }
 
 // -----------------------------------------------------------------
-// Ranges persistence
+// Live Range Cache (populated from range group polling)
 // -----------------------------------------------------------------
-const RANGES_FILE = path.join(__dirname, '..', 'data', 'ranges.json');
+// liveRanges: { "Guinea": [ { range, carrier, app, iso, timestamp }, ... ], ... }
+const liveRanges = {};
+const LIVE_RANGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-function loadRanges() {
-  try {
-    const data = fs.readFileSync(RANGES_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (e) {
-    return [];
+function addLiveRange(country, range, carrier, app, iso) {
+  if (!liveRanges[country]) liveRanges[country] = [];
+  liveRanges[country].push({ range, carrier, app, iso, timestamp: Date.now() });
+  // Keep max 50 entries per country to prevent memory leak
+  if (liveRanges[country].length > 50) {
+    liveRanges[country] = liveRanges[country].slice(-50);
   }
 }
 
-function saveRanges(ranges) {
-  fs.mkdirSync(path.dirname(RANGES_FILE), { recursive: true });
-  fs.writeFileSync(RANGES_FILE, JSON.stringify(ranges, null, 2));
+function getLiveCountries() {
+  const cutoff = Date.now() - LIVE_RANGE_TTL_MS;
+  const results = [];
+  for (const country of Object.keys(liveRanges)) {
+    const recent = liveRanges[country].filter(r => r.timestamp > cutoff);
+    if (recent.length > 0) {
+      // Most recent entry for flag/iso
+      const latest = recent[recent.length - 1];
+      results.push({ country, count: recent.length, iso: latest.iso, range: latest.range });
+    }
+  }
+  return results;
+}
+
+function getBestRange(country) {
+  const cutoff = Date.now() - LIVE_RANGE_TTL_MS;
+  const entries = (liveRanges[country] || []).filter(r => r.timestamp > cutoff);
+  if (entries.length === 0) return null;
+  // Return the most recent range
+  return entries[entries.length - 1];
 }
 
 // -----------------------------------------------------------------
@@ -123,30 +142,19 @@ function saveRanges(ranges) {
 // -----------------------------------------------------------------
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-
-  const ranges = loadRanges();
-  const activeApi = getActiveApi();
   const balance = await getBalance(chatId);
 
-  const keyboard = [];
-
-  // Show top 3 ranges as buttons if available
-  if (ranges.length > 0) {
-    const topRanges = ranges.slice(0, 3);
-    for (const r of topRanges) {
-      keyboard.push([{ text: `📱 ${r}`, callback_data: `range:${r}` }]);
-    }
-  }
-
-  keyboard.push([{ text: '📊 Active Range', url: 'https://t.me/srfranges' }]);
-
-  const welcome = ranges.length > 0
-    ? `Welcome to the *SRF Number Bot!*\n\n💰 *Your Balance:* \`${balance}\` points\n\nSelect a range below or type a range directly:`
-    : `Welcome to the *SRF Number Bot!*\n\n💰 *Your Balance:* \`${balance}\` points\n\nType a number range to get started (e.g. \`224655XXXXXX\`):`;
+  const welcome = `Welcome to the *SRF Number Bot!* 🚀\n\n💰 *Your Balance:* \`${balance}\` points\n\nTap a button below to get started:`;
 
   bot.sendMessage(chatId, welcome, {
     parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: keyboard }
+    reply_markup: {
+      keyboard: [
+        [{ text: '📲 Get Number' }, { text: '📡 Live Traffic' }]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
+    }
   });
 });
 
@@ -161,25 +169,21 @@ bot.onText(/\/admin/, (msg) => {
   }
 
   if (!ADMIN_ID) {
-    // If ADMIN_ID not set, allow anyone (for initial setup)
     console.warn(`Admin command used by ${chatId}. Set ADMIN_ID=${chatId} in .env to restrict.`);
   }
 
-  const ranges = loadRanges();
   const activeApi = getActiveApi();
   const apiLabel = getApiLabel(activeApi);
-  const rangeList = ranges.length > 0
-    ? ranges.map((r, i) => `${i + 1}. \`${r}\``).join('\n')
-    : '_No ranges configured._';
+  const liveCountries = getLiveCountries();
+  const liveList = liveCountries.length > 0
+    ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
+    : '_No live ranges right now._';
 
   bot.sendMessage(chatId,
-    `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${apiLabel}\n\n*Active Ranges:*\n${rangeList}\n\nUse the buttons below to manage:`, {
+    `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${apiLabel}\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '➕ Add Range', callback_data: 'admin_add_range' }],
-          [{ text: '🗑️ Remove Range', callback_data: 'admin_remove_range' }],
-          [{ text: '📋 View Ranges', callback_data: 'admin_view_ranges' }],
           [{ text: `🔄 Switch API (→ ${activeApi === 'mknetwork' ? 'NexaOTP' : 'MK Network'})`, callback_data: 'admin_switch_api' }],
           [{ text: '💰 Edit User Balance', callback_data: 'admin_edit_balance' }]
         ]
@@ -300,17 +304,16 @@ bot.on('callback_query', async (query) => {
   try {
     const chatId = query.message.chat.id;
 
-    // --- User: Select a preset range ---
-    if (query.data.startsWith('range:')) {
-      const range = query.data.substring(6);
+    // --- User: Select a country to get number ---
+    if (query.data.startsWith('country:')) {
+      const country = query.data.substring(8);
       bot.answerCallbackQuery(query.id).catch(() => {});
-      await fetchNumberForUser(chatId, range);
-    }
-    // --- User: Enter custom range ---
-    else if (query.data === 'custom_range') {
-      bot.answerCallbackQuery(query.id).catch(() => {});
-      adminStates[chatId] = 'WAITING_FOR_RANGE';
-      bot.sendMessage(chatId, 'Please enter the number range (e.g., `224655XXXXXX`):', { parse_mode: 'Markdown' }).catch(() => {});
+      const best = getBestRange(country);
+      if (!best) {
+        bot.sendMessage(chatId, `⚠️ No live ranges for *${country}* right now. Try again in a moment.`, { parse_mode: 'Markdown' }).catch(() => {});
+        return;
+      }
+      await fetchNumberForUser(chatId, best.range);
     }
     // --- User: Change number (from success msg - delete old) ---
     else if (query.data.startsWith('change_number:')) {
@@ -383,52 +386,7 @@ bot.on('callback_query', async (query) => {
         knownOtpCount: lastData.lastOtpCount || 0  // skip previously seen OTPs
       };
     }
-    // --- Admin: Add Range ---
-    else if (query.data === 'admin_add_range') {
-      if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
-      bot.answerCallbackQuery(query.id).catch(() => {});
-      adminStates[chatId] = 'ADMIN_ADDING_RANGE';
-      bot.sendMessage(chatId, '📝 Send the range to add (e.g., `224655XXXXXX`):', { parse_mode: 'Markdown' }).catch(() => {});
-    }
-    // --- Admin: Remove Range ---
-    else if (query.data === 'admin_remove_range') {
-      if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
-      bot.answerCallbackQuery(query.id).catch(() => {});
-      const ranges = loadRanges();
-      if (ranges.length === 0) {
-        return bot.sendMessage(chatId, '❌ No ranges to remove.').catch(() => {});
-      }
-      const keyboard = ranges.map((r, i) => [{ text: `🗑️ ${r}`, callback_data: `admin_del:${i}` }]);
-      bot.sendMessage(chatId, 'Select a range to remove:', { reply_markup: { inline_keyboard: keyboard } }).catch(() => {});
-    }
-    // --- Admin: Confirm delete ---
-    else if (query.data.startsWith('admin_del:')) {
-      if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
-      const index = parseInt(query.data.split(':')[1]);
-      const ranges = loadRanges();
-      if (index >= 0 && index < ranges.length) {
-        const removed = ranges.splice(index, 1)[0];
-        saveRanges(ranges);
-        bot.answerCallbackQuery(query.id, { text: `Removed: ${removed}` }).catch(() => {});
-        bot.editMessageText(`✅ Range \`${removed}\` removed.`, {
-          chat_id: chatId,
-          message_id: query.message.message_id,
-          parse_mode: 'Markdown'
-        }).catch(() => {});
-      } else {
-        bot.answerCallbackQuery(query.id, { text: 'Invalid range' }).catch(() => {});
-      }
-    }
-    // --- Admin: View Ranges ---
-    else if (query.data === 'admin_view_ranges') {
-      if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
-      bot.answerCallbackQuery(query.id).catch(() => {});
-      const ranges = loadRanges();
-      const rangeList = ranges.length > 0
-        ? ranges.map((r, i) => `${i + 1}. \`${r}\``).join('\n')
-        : '_No ranges configured._';
-      bot.sendMessage(chatId, `📋 *Active Ranges:*\n\n${rangeList}`, { parse_mode: 'Markdown' }).catch(() => {});
-    }
+
     // --- Admin: Switch API ---
     else if (query.data === 'admin_switch_api') {
       if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
@@ -444,21 +402,18 @@ bot.on('callback_query', async (query) => {
       bot.answerCallbackQuery(query.id, { text: `Switched to ${newLabel}` }).catch(() => {});
 
       // Update the admin panel message in-place
-      const ranges = loadRanges();
-      const rangeList = ranges.length > 0
-        ? ranges.map((r, i) => `${i + 1}. \`${r}\``).join('\n')
-        : '_No ranges configured._';
+      const liveCountries = getLiveCountries();
+      const liveList = liveCountries.length > 0
+        ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
+        : '_No live ranges right now._';
 
       bot.editMessageText(
-        `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${newLabel} ✅\n\n*Active Ranges:*\n${rangeList}\n\nUse the buttons below to manage:`, {
+        `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${newLabel} ✅\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
           chat_id: chatId,
           message_id: query.message.message_id,
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '➕ Add Range', callback_data: 'admin_add_range' }],
-              [{ text: '🗑️ Remove Range', callback_data: 'admin_remove_range' }],
-              [{ text: '📋 View Ranges', callback_data: 'admin_view_ranges' }],
               [{ text: `🔄 Switch API (→ ${nextSwitch})`, callback_data: 'admin_switch_api' }],
               [{ text: '💰 Edit User Balance', callback_data: 'admin_edit_balance' }]
             ]
@@ -522,17 +477,33 @@ bot.on('message', async (msg) => {
 
   if (!text || text.startsWith('/')) return;
 
-  // Admin adding a range
-  if (adminStates[chatId] === 'ADMIN_ADDING_RANGE') {
-    adminStates[chatId] = null;
-    const range = text.trim();
-    const ranges = loadRanges();
-    if (ranges.includes(range)) {
-      return bot.sendMessage(chatId, `⚠️ Range \`${range}\` already exists.`, { parse_mode: 'Markdown' });
+  // --- Reply Keyboard: Get Number ---
+  if (text === '📲 Get Number') {
+    const countries = getLiveCountries();
+    if (countries.length === 0) {
+      return bot.sendMessage(chatId, '😔 No live ranges available right now.\n\n_Ranges appear here automatically when new ones drop in the range group. Try again in a moment._', { parse_mode: 'Markdown' }).catch(() => {});
     }
-    ranges.push(range);
-    saveRanges(ranges);
-    return bot.sendMessage(chatId, `✅ Range \`${range}\` added!`, { parse_mode: 'Markdown' });
+    const keyboard = countries.map(c => {
+      const flag = isoToFlag(c.iso) || '🌍';
+      return [{ text: `${flag} ${c.country} (${c.count})`, callback_data: `country:${c.country}` }];
+    });
+    return bot.sendMessage(chatId, '🌍 *Select a country to get a number:*', {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard }
+    }).catch(() => {});
+  }
+
+  // --- Reply Keyboard: Live Traffic ---
+  if (text === '📡 Live Traffic') {
+    const countries = getLiveCountries();
+    if (countries.length === 0) {
+      return bot.sendMessage(chatId, '📡 *Live Traffic*\n\n_No live traffic in the last 5 minutes._\n\nNew ranges will appear here automatically when they drop.', { parse_mode: 'Markdown' }).catch(() => {});
+    }
+    const lines = countries.map(c => {
+      const flag = isoToFlag(c.iso) || '🌍';
+      return `${flag} *${c.country}* — \`${c.count}\` range(s)\n    └ Latest: \`${c.range}\``;
+    });
+    return bot.sendMessage(chatId, `📡 *Live Traffic (last 5 min)*\n\n${lines.join('\n\n')}`, { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   // Admin: waiting for new balance amount
@@ -545,12 +516,6 @@ bot.on('message', async (msg) => {
     const newBal = await setBalance(userId, amount);
     adminStates[chatId] = null;
     return bot.sendMessage(chatId, `✅ Balance updated!\n\n👤 *User:* \`${userId}\`\n💰 *New Balance:* \`${newBal}\` points`, { parse_mode: 'Markdown' }).catch(() => {});
-  }
-
-  // User waiting to enter custom range
-  if (adminStates[chatId] === 'WAITING_FOR_RANGE') {
-    adminStates[chatId] = null;
-    return await fetchNumberForUser(chatId, text.trim());
   }
 
   // Direct range typing — any text that looks like a number range
@@ -863,6 +828,9 @@ if (RANGE_GROUP_ID) {
           // Format range to show first 7 digits and pad with 6 'X's
           const rawNumber = log.number || '';
           const rangeStr = rawNumber.length >= 7 ? rawNumber.substring(0, 7) + 'XXXXXX' : rawNumber;
+
+          // Cache this range for Get Number / Live Traffic
+          addLiveRange(log.country, rangeStr, log.carrier, log.app_name, iso);
 
           const message = `🌟 *New Range Dropped*\n\n` +
                           `📱 *App:* ${log.app_name}\n` +
