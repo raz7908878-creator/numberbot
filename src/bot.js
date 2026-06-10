@@ -650,8 +650,10 @@ setInterval(async () => {
           if (OTP_GROUP_ID) {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
+            const safeSms = newSms.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>${safeSms}</blockquote>`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
+              parse_mode: 'HTML',
               reply_markup: {
                 inline_keyboard: [
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
@@ -771,8 +773,10 @@ setInterval(async () => {
           if (OTP_GROUP_ID) {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
+            const safeSms = newSms.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>${safeSms}</blockquote>`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
+              parse_mode: 'HTML',
               reply_markup: {
                 inline_keyboard: [
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
