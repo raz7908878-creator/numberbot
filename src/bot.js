@@ -257,11 +257,10 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: '⏩ Change Number', callback_data: `change_number:${range}`, style: 'success' },
-              { text: '🌐 Change Country', callback_data: `change_country`, style: 'primary' }
+              { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
+              { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
             ],
             [
-              { text: '🏠 Home', callback_data: `go_home`, style: 'danger' },
               { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'success' }
             ]
           ]
@@ -318,29 +317,6 @@ bot.on('callback_query', async (query) => {
       }
       await fetchNumberForUser(chatId, best.range);
     }
-    // --- User: Change Country ---
-    if (query.data === 'change_country') {
-      bot.answerCallbackQuery(query.id).catch(() => {});
-      bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-      // Trigger the get number flow again
-      const countries = getLiveCountries();
-      if (countries.length === 0) {
-        return bot.sendMessage(chatId, '😔 No live ranges available right now.', { parse_mode: 'Markdown' }).catch(() => {});
-      }
-      const keyboard = countries.map(c => {
-        const flag = isoToFlag(c.iso) || '🌍';
-        return [{ text: `${flag} ${c.country} (${c.count})`, callback_data: `country:${c.country}` }];
-      });
-      return bot.sendMessage(chatId, '🌍 *Select a country to get a number:*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(() => {});
-    }
-    // --- User: Go Home ---
-    if (query.data === 'go_home') {
-      bot.answerCallbackQuery(query.id).catch(() => {});
-      bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-      const balance = await getBalance(chatId);
-      const welcome = `Welcome to the *SRF Number Bot!* 🚀\n\n💰 *Your Balance:* \`${balance}\` points\n\nTap a button below to get started:`;
-      return bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown', reply_markup: { keyboard: [[{ text: '📲 Get Number' }, { text: '📡 Live Traffic' }]], resize_keyboard: true, one_time_keyboard: false } }).catch(() => {});
-    }
     // --- User: Change number (from success msg - delete old) ---
     else if (query.data.startsWith('change_number:')) {
       const range = query.data.split(':')[1];
@@ -390,11 +366,10 @@ bot.on('callback_query', async (query) => {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: '⏩ Change Number', callback_data: `change_number:${lastData.range}`, style: 'success' },
-              { text: '🌐 Change Country', callback_data: `change_country`, style: 'primary' }
+              { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}`, style: 'success' },
+              { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
             ],
             [
-              { text: '🏠 Home', callback_data: `go_home`, style: 'danger' },
               { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'success' }
             ]
           ]
@@ -644,11 +619,10 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '⏩ Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
-                  { text: '🌐 Change Country', callback_data: `change_country`, style: 'primary' }
+                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
+                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
-                  { text: '🏠 Home', callback_data: `go_home`, style: 'danger' },
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'success' }
                 ]
               ]
@@ -748,11 +722,10 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '⏩ Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
-                  { text: '🌐 Change Country', callback_data: `change_country`, style: 'primary' }
+                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
+                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
-                  { text: '🏠 Home', callback_data: `go_home`, style: 'danger' },
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'success' }
                 ]
               ]
