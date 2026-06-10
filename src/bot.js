@@ -827,9 +827,9 @@ if (RANGE_GROUP_ID) {
           const iso = nexaApi.countryToIso(log.country);
           const flag = isoToFlag(iso) || '🌍';
           
-          // Format range to show first 6 digits and pad with 7 'X's
+          // Format range to show first 7 digits and pad with 6 'X's
           const rawNumber = log.number || '';
-          const rangeStr = rawNumber.length >= 6 ? rawNumber.substring(0, 6) + 'XXXXXXX' : rawNumber;
+          const rangeStr = rawNumber.length >= 7 ? rawNumber.substring(0, 7) + 'XXXXXX' : rawNumber;
 
           // Cache this range for Get Number / Live Traffic
           addLiveRange(log.country, rangeStr, log.carrier, log.app_name, iso);
