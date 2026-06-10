@@ -5,7 +5,7 @@ const path = require('path');
 const mkApi = require('./api');
 const nexaApi = require('./nexaApi');
 const { getBalance, setBalance, addBalance, getAllBalances } = require('./balance');
-const { authenticator } = require('otplib');
+const { TOTP } = require('totp-generator');
 
 const awaiting2fa = {};
 // -----------------------------------------------------------------
@@ -153,7 +153,7 @@ bot.onText(/\/start/, async (msg) => {
     reply_markup: {
       keyboard: [
         [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }],
-        [{ text: '🛡️ Get 2FA', style: 'primary' }, { text: '🆘 Support' }]
+        [{ text: '🛡️ Get 2FA', style: 'primary' }, { text: '🆘 Support', style: 'primary' }]
       ],
       resize_keyboard: true,
       one_time_keyboard: false
@@ -506,8 +506,8 @@ bot.on('message', async (msg) => {
       delete awaiting2fa[chatId];
       try {
         const secret = text.replace(/\s+/g, '').toUpperCase();
-        const code = authenticator.generate(secret);
-        return bot.sendMessage(chatId, `✅ *Your 2FA Code is:*\n\n\`${code}\``, { parse_mode: 'Markdown' });
+        const { otp } = await TOTP.generate(secret);
+        return bot.sendMessage(chatId, `✅ *Your 2FA Code is:*\n\n\`${otp}\``, { parse_mode: 'Markdown' });
       } catch (e) {
         return bot.sendMessage(chatId, '❌ *Invalid 2FA Secret Key.* Please check the key and try again.', { parse_mode: 'Markdown' });
       }
