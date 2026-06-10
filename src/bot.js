@@ -150,7 +150,7 @@ bot.onText(/\/start/, async (msg) => {
     parse_mode: 'Markdown',
     reply_markup: {
       keyboard: [
-        [{ text: '📲 Get Number' }, { text: '📡 Live Traffic' }]
+        [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }]
       ],
       resize_keyboard: true,
       one_time_keyboard: false
