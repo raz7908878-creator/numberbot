@@ -631,10 +631,19 @@ setInterval(async () => {
 
           // Forward to OTP group with masked number
           if (OTP_GROUP_ID) {
-            const masked = maskNumber(pNumber);
-            const groupFlag = isoToFlag(reqData.iso);
-            const groupMsg = `📩 *OTP Received*\n\n${groupFlag} *Number:* \`${masked}\`\n🔑 *Code:* \`${newOtps}\`\n📝 *SMS:* \`${newSms}\``;
-            bot.sendMessage(OTP_GROUP_ID, groupMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
+            const groupMsg = `🏳 ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
+            bot.sendMessage(OTP_GROUP_ID, groupMsg, {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: `🐱 ${newOtps}`, callback_data: 'dummy_otp' }],
+                  [
+                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot' },
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/srfmk_bot' }
+                  ]
+                ]
+              }
+            }).catch(() => {});
           }
 
           // Remove from tracking
@@ -725,10 +734,19 @@ setInterval(async () => {
 
           // Forward to OTP group with masked number
           if (OTP_GROUP_ID) {
-            const masked = maskNumber(pNumber);
-            const groupFlag = isoToFlag(reqData.iso);
-            const groupMsg = `📩 *OTP Received*\n\n${groupFlag} *Number:* \`${masked}\`\n🔑 *Code:* \`${newOtps}\`\n📝 *SMS:* \`${newSms}\``;
-            bot.sendMessage(OTP_GROUP_ID, groupMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
+            const groupMsg = `🏳 ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
+            bot.sendMessage(OTP_GROUP_ID, groupMsg, {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: `🐱 ${newOtps}`, callback_data: 'dummy_otp' }],
+                  [
+                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot' },
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/srfmk_bot' }
+                  ]
+                ]
+              }
+            }).catch(() => {});
           }
 
           // Remove from tracking
