@@ -121,7 +121,7 @@ function getLiveCountries() {
       results.push({ country, count: recent.length, iso: latest.iso, range: latest.range });
     }
   }
-  return results;
+  return results.sort((a, b) => b.count - a.count);
 }
 
 function getBestRange(country) {
