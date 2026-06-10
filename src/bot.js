@@ -5,7 +5,9 @@ const path = require('path');
 const mkApi = require('./api');
 const nexaApi = require('./nexaApi');
 const { getBalance, setBalance, addBalance, getAllBalances } = require('./balance');
+const { authenticator } = require('otplib');
 
+const awaiting2fa = {};
 // -----------------------------------------------------------------
 // Global error handlers — prevent crash on transient network errors
 // -----------------------------------------------------------------
@@ -150,7 +152,8 @@ bot.onText(/\/start/, async (msg) => {
     parse_mode: 'Markdown',
     reply_markup: {
       keyboard: [
-        [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }]
+        [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }],
+        [{ text: '🛡️ Get 2FA', style: 'primary' }, { text: '🆘 Support' }]
       ],
       resize_keyboard: true,
       one_time_keyboard: false
@@ -478,6 +481,40 @@ bot.on('message', async (msg) => {
   const text = msg.text;
 
   if (!text || text.startsWith('/')) return;
+
+  // --- Support ---
+  if (text === '🆘 Support' || text === 'Support') {
+    delete awaiting2fa[chatId];
+    return bot.sendMessage(chatId, 'Need help? Contact our admin for support!', {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🧑‍💻 Contact Admin', url: 'https://t.me/raz908878', style: 'primary' }]
+        ]
+      }
+    });
+  }
+
+  // --- Get 2FA ---
+  if (text === '🛡️ Get 2FA' || text === 'Get 2FA') {
+    awaiting2fa[chatId] = true;
+    return bot.sendMessage(chatId, '🔐 *Please send your 2FA Security Key (Base32 secret):*', { parse_mode: 'Markdown' });
+  }
+
+  // --- 2FA Secret Input ---
+  if (awaiting2fa[chatId]) {
+    if (!['📲 Get Number', '📡 Live Traffic', '🛡️ Get 2FA', '🆘 Support'].some(btn => text.includes(btn))) {
+      delete awaiting2fa[chatId];
+      try {
+        const secret = text.replace(/\s+/g, '').toUpperCase();
+        const code = authenticator.generate(secret);
+        return bot.sendMessage(chatId, `✅ *Your 2FA Code is:*\n\n\`${code}\``, { parse_mode: 'Markdown' });
+      } catch (e) {
+        return bot.sendMessage(chatId, '❌ *Invalid 2FA Secret Key.* Please check the key and try again.', { parse_mode: 'Markdown' });
+      }
+    } else {
+      delete awaiting2fa[chatId]; // User clicked another menu button, fall through to normal handling
+    }
+  }
 
   // --- Reply Keyboard: Get Number ---
   if (text === '📲 Get Number' || text === '📲 Get Number') {
