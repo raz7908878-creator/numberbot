@@ -632,14 +632,15 @@ setInterval(async () => {
           // Forward to OTP group with masked number
           if (OTP_GROUP_ID) {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
-            const groupMsg = `🏳 ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
+            const flag = isoToFlag(reqData.iso) || '🏳';
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: `🐱 ${newOtps}`, callback_data: 'dummy_otp' }],
+                  [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
                   [
-                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot' },
-                    { text: '🧑‍💻 Developer', url: 'https://t.me/srfmk_bot' }
+                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot', style: 'primary' },
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz908878', style: 'danger' }
                   ]
                 ]
               }
@@ -735,14 +736,15 @@ setInterval(async () => {
           // Forward to OTP group with masked number
           if (OTP_GROUP_ID) {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
-            const groupMsg = `🏳 ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
+            const flag = isoToFlag(reqData.iso) || '🏳';
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n📝 SMS: ${newSms}`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: `🐱 ${newOtps}`, callback_data: 'dummy_otp' }],
+                  [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
                   [
-                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot' },
-                    { text: '🧑‍💻 Developer', url: 'https://t.me/srfmk_bot' }
+                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot', style: 'primary' },
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz908878', style: 'danger' }
                   ]
                 ]
               }
