@@ -308,8 +308,8 @@ bot.on('callback_query', async (query) => {
     if (query.data.startsWith('country:')) {
       const country = query.data.substring(8);
       bot.answerCallbackQuery(query.id).catch(() => {});
-      // Delete the country selection message
-      try { await bot.deleteMessage(chatId, query.message.message_id); } catch (e) { /* ignore */ }
+      // Delete the country selection message (fire-and-forget, don't wait)
+      bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
       const best = getBestRange(country);
       if (!best) {
         bot.sendMessage(chatId, `⚠️ No live ranges for *${country}* right now. Try again in a moment.`, { parse_mode: 'Markdown' }).catch(() => {});
