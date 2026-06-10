@@ -507,7 +507,14 @@ bot.on('message', async (msg) => {
       try {
         const secret = text.replace(/\s+/g, '').toUpperCase();
         const { otp } = await TOTP.generate(secret);
-        return bot.sendMessage(chatId, `✅ *Your 2FA Code is:*\n\n\`${otp}\``, { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, `✅ *Your 2FA Code is:*`, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: `🔑 ${otp}`, copy_text: { text: otp } }]
+            ]
+          }
+        });
       } catch (e) {
         return bot.sendMessage(chatId, '❌ *Invalid 2FA Secret Key.* Please check the key and try again.', { parse_mode: 'Markdown' });
       }
