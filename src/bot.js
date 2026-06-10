@@ -640,7 +640,7 @@ setInterval(async () => {
                   { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
-                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'success' }
+                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
                 ]
               ]
             }
@@ -763,7 +763,7 @@ setInterval(async () => {
                   { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
-                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'success' }
+                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
                 ]
               ]
             }
