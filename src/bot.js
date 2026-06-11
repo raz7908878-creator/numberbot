@@ -98,6 +98,26 @@ function isoToFlag(iso) {
   );
 }
 
+// Detect language from SMS text
+function detectLanguage(text) {
+  if (!text) return 'English';
+  const lowerText = text.toLowerCase();
+  
+  if (lowerText.includes('es tu') || lowerText.includes('código') || lowerText.includes('codigo')) return 'Spanish';
+  if (lowerText.includes('est votre') || lowerText.includes('votre code')) return 'French';
+  if (lowerText.includes('é o seu') || lowerText.includes('seu código') || lowerText.includes('seu codigo')) return 'Portuguese';
+  if (lowerText.includes('adalah kode') || lowerText.includes('kode anda')) return 'Indonesian';
+  if (lowerText.includes('ваш код') || lowerText.includes('код')) return 'Russian';
+  if (lowerText.includes('رمز') || lowerText.includes('كود')) return 'Arabic';
+  if (lowerText.includes('ist dein') || lowerText.includes('dein code')) return 'German';
+  if (lowerText.includes('è il tuo') || lowerText.includes('il tuo codice')) return 'Italian';
+  if (lowerText.includes('mã của')) return 'Vietnamese';
+  if (lowerText.includes('รหัส')) return 'Thai';
+  if (lowerText.includes('कोड़') || lowerText.includes('कोड')) return 'Hindi';
+
+  return 'English';
+}
+
 // -----------------------------------------------------------------
 // Live Range Cache (populated from range group polling)
 // -----------------------------------------------------------------
@@ -705,7 +725,8 @@ setInterval(async () => {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
             const safeSms = newSms.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>${safeSms}</blockquote>`;
+            const detectedLang = detectLanguage(newSms);
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · ${detectedLang}\n<blockquote>${safeSms}</blockquote>`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
               parse_mode: 'HTML',
               reply_markup: {
@@ -828,7 +849,8 @@ setInterval(async () => {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
             const safeSms = newSms.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>${safeSms}</blockquote>`;
+            const detectedLang = detectLanguage(newSms);
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · ${detectedLang}\n<blockquote>${safeSms}</blockquote>`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
               parse_mode: 'HTML',
               reply_markup: {
@@ -940,7 +962,8 @@ setInterval(async () => {
             const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
             const flag = isoToFlag(reqData.iso) || '🏳';
             const safeSms = newSms.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>${safeSms}</blockquote>`;
+            const detectedLang = detectLanguage(newSms);
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · ${detectedLang}\n<blockquote>${safeSms}</blockquote>`;
             bot.sendMessage(OTP_GROUP_ID, groupMsg, {
               parse_mode: 'HTML',
               reply_markup: {
