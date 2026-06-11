@@ -68,10 +68,6 @@ function getActiveApi() {
   return loadConfig().activeApi || 'mknetwork';
 }
 
-function getActiveRangeApi() {
-  return loadConfig().activeRangeApi || 'nexaotp';
-}
-
 function getApiLabel(api) {
   return api === 'nexaotp' ? 'NexaOTP' : (api === 'zenex' ? 'Zenex Panel' : 'MK Network');
 }
@@ -203,20 +199,17 @@ bot.onText(/\/admin/, (msg) => {
 
   const activeApi = getActiveApi();
   const apiLabel = getApiLabel(activeApi);
-  const activeRangeApi = getActiveRangeApi();
-  const rangeApiLabel = getApiLabel(activeRangeApi);
   const liveCountries = getLiveCountries();
   const liveList = liveCountries.length > 0
     ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
     : '_No live ranges right now._';
 
   bot.sendMessage(chatId,
-    `⚙️ *Admin Panel*\n\n🔌 *Active Num API:* ${apiLabel}\n📡 *Active Range API:* ${rangeApiLabel}\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
+    `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${apiLabel}\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: `🔄 Switch Num API (→ ${activeApi === 'mknetwork' ? 'NexaOTP' : (activeApi === 'nexaotp' ? 'Zenex Panel' : 'MK Network')})`, callback_data: 'admin_switch_api' }],
-          [{ text: `🔄 Switch Range API (→ ${activeRangeApi === 'mknetwork' ? 'NexaOTP' : 'MK Network'})`, callback_data: 'admin_switch_range_api' }],
+          [{ text: `🔄 Switch API (→ ${activeApi === 'mknetwork' ? 'NexaOTP' : (activeApi === 'nexaotp' ? 'Zenex Panel' : 'MK Network')})`, callback_data: 'admin_switch_api' }],
           [{ text: '💰 Edit User Balance', callback_data: 'admin_edit_balance' }]
         ]
       }
@@ -441,61 +434,19 @@ bot.on('callback_query', async (query) => {
       bot.answerCallbackQuery(query.id, { text: `Switched to ${newLabel}` }).catch(() => {});
 
       // Update the admin panel message in-place
-      const activeRangeApi = getActiveRangeApi();
-      const rangeApiLabel = getApiLabel(activeRangeApi);
       const liveCountries = getLiveCountries();
       const liveList = liveCountries.length > 0
         ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
         : '_No live ranges right now._';
 
       bot.editMessageText(
-        `⚙️ *Admin Panel*\n\n🔌 *Active Num API:* ${newLabel} ✅\n📡 *Active Range API:* ${rangeApiLabel}\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
+        `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${newLabel} ✅\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
           chat_id: chatId,
           message_id: query.message.message_id,
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [{ text: `🔄 Switch Num API (→ ${nextSwitch})`, callback_data: 'admin_switch_api' }],
-              [{ text: `🔄 Switch Range API (→ ${activeRangeApi === 'mknetwork' ? 'NexaOTP' : 'MK Network'})`, callback_data: 'admin_switch_range_api' }],
-              [{ text: '💰 Edit User Balance', callback_data: 'admin_edit_balance' }]
-            ]
-          }
-        }).catch(() => {});
-    }
-    // --- Admin: Switch Range API ---
-    else if (query.data === 'admin_switch_range_api') {
-      if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
-
-      const config = loadConfig();
-      const activeRangeApi = config.activeRangeApi || 'nexaotp';
-      const newRangeApi = activeRangeApi === 'mknetwork' ? 'nexaotp' : 'mknetwork';
-      config.activeRangeApi = newRangeApi;
-      saveConfig(config);
-
-      const newLabel = getApiLabel(newRangeApi);
-      bot.answerCallbackQuery(query.id, { text: `Range API switched to ${newLabel}` }).catch(() => {});
-
-      const activeApi = getActiveApi();
-      const numApiLabel = getApiLabel(activeApi);
-      const apis = ['mknetwork', 'nexaotp', 'zenex'];
-      const currentIndex = apis.indexOf(activeApi) !== -1 ? apis.indexOf(activeApi) : 0;
-      const nextNumApi = apis[(currentIndex + 1) % apis.length];
-      const nextNumSwitch = getApiLabel(nextNumApi);
-
-      const liveCountries = getLiveCountries();
-      const liveList = liveCountries.length > 0
-        ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
-        : '_No live ranges right now._';
-
-      bot.editMessageText(
-        `⚙️ *Admin Panel*\n\n🔌 *Active Num API:* ${numApiLabel}\n📡 *Active Range API:* ${newLabel} ✅\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
-          chat_id: chatId,
-          message_id: query.message.message_id,
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: `🔄 Switch Num API (→ ${nextNumSwitch})`, callback_data: 'admin_switch_api' }],
-              [{ text: `🔄 Switch Range API (→ ${newRangeApi === 'mknetwork' ? 'NexaOTP' : 'MK Network'})`, callback_data: 'admin_switch_range_api' }],
+              [{ text: `🔄 Switch API (→ ${nextSwitch})`, callback_data: 'admin_switch_api' }],
               [{ text: '💰 Edit User Balance', callback_data: 'admin_edit_balance' }]
             ]
           }
@@ -1083,10 +1034,7 @@ if (RANGE_GROUP_ID) {
     isRangePolling = true;
 
     try {
-      const activeRangeApi = getActiveRangeApi();
-      const logs = activeRangeApi === 'mknetwork' 
-        ? await mkApi.getConsoleLogs() 
-        : await nexaApi.getConsoleLogs();
+      const logs = await nexaApi.getConsoleLogs();
 
       if (logs.length === 0) {
         isRangePolling = false;

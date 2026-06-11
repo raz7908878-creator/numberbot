@@ -238,57 +238,8 @@ async function getHistory(page = 1, limit = 50) {
   }
 }
 
-/**
- * Fetches the console logs for Range Group from MK Network.
- */
-async function getConsoleLogs() {
-  try {
-    const cookie = getCookie();
-    if (!cookie) {
-      return [];
-    }
-
-    const headers = {
-      'accept': '*/*',
-      'accept-encoding': 'gzip, deflate, br, zstd',
-      'accept-language': 'en-GB,en;q=0.5',
-      'cookie': cookie,
-      'referer': 'https://mknetworkbd.com/console.php',
-      'sec-ch-ua': '"Brave";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"Windows"',
-      'sec-fetch-dest': 'empty',
-      'sec-fetch-mode': 'cors',
-      'sec-fetch-site': 'same-origin',
-      'sec-gpc': '1',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
-    };
-
-    const response = await axios.get('https://mknetworkbd.com/console.php?ajax=1', { headers, timeout: 15000 });
-
-    if (response.data && response.data.feed) {
-      return response.data.feed
-        .filter(item => item.time && item.time.text === 'Just Now')
-        .map(item => ({
-          id: `${item.range}_${item.time.text}_${item.msg}`,
-          number: item.range,
-          time: item.time.text,
-          otp: '******',
-          app_name: item.service_name,
-          country: item.country,
-          carrier: item.operator
-        }));
-    }
-    return [];
-  } catch (error) {
-    console.error('MK getConsoleLogs Request failed:', error.message);
-    return [];
-  }
-}
-
 module.exports = {
   getNumber,
   getHistory,
-  startCookieRefreshLoop,
-  getConsoleLogs
+  startCookieRefreshLoop
 };
