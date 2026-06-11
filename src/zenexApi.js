@@ -142,9 +142,34 @@ async function getHistory(page = 1, limit = 15) {
   }
 }
 
-// Zenex doesn't seem to have a console log endpoint for ranges based on user examples
 async function getConsoleLogs() {
-  return [];
+  try {
+    const apiKey = getApiKey();
+    if (!apiKey) return [];
+
+    const response = await axios.get(`${BASE_URL}/active-ranges`, {
+      headers: {
+        'mapikey': apiKey
+      },
+      timeout: 15000
+    });
+
+    if (response.data && response.data.success && response.data.data && response.data.data.active_ranges) {
+      const ranges = response.data.data.active_ranges;
+      return ranges.map(item => {
+        return {
+          id: `${item.range}_${item.service}_${item.hits}`,
+          number: item.range,
+          app_name: item.service,
+          country: 'Unknown',
+          carrier: item.tag
+        };
+      });
+    }
+    return [];
+  } catch (error) {
+    return [];
+  }
 }
 
 module.exports = {
