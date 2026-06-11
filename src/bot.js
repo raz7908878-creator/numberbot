@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const mkApi = require('./api');
 const nexaApi = require('./nexaApi');
+const zenexApi = require('./zenexApi');
 const { getBalance, setBalance, addBalance, getAllBalances } = require('./balance');
 const { TOTP } = require('totp-generator');
 
@@ -39,6 +40,7 @@ if (!process.env.MK_LOGIN_ID || !process.env.MK_PASSWORD) {
 // Start background cookie refresh (immediate + every 5 minutes)
 mkApi.startCookieRefreshLoop();
 nexaApi.startCookieRefreshLoop();
+zenexApi.startCookieRefreshLoop();
 
 const bot = new TelegramBot(token, { polling: true });
 const rangeBot = rangeBotToken ? new TelegramBot(rangeBotToken, { polling: false }) : bot;
@@ -67,7 +69,7 @@ function getActiveApi() {
 }
 
 function getApiLabel(api) {
-  return api === 'nexaotp' ? 'NexaOTP' : 'MK Network';
+  return api === 'nexaotp' ? 'NexaOTP' : (api === 'zenex' ? 'Zenex Panel' : 'MK Network');
 }
 
 // Store pending numbers to poll for OTPs.
@@ -187,7 +189,7 @@ bot.onText(/\/admin/, (msg) => {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: `🔄 Switch API (→ ${activeApi === 'mknetwork' ? 'NexaOTP' : 'MK Network'})`, callback_data: 'admin_switch_api' }],
+          [{ text: `🔄 Switch API (→ ${activeApi === 'mknetwork' ? 'NexaOTP' : (activeApi === 'nexaotp' ? 'Zenex Panel' : 'MK Network')})`, callback_data: 'admin_switch_api' }],
           [{ text: '💰 Edit User Balance', callback_data: 'admin_edit_balance' }]
         ]
       }
@@ -223,6 +225,8 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
       try {
         if (activeApi === 'nexaotp') {
           response = await nexaApi.getNumber(range);
+        } else if (activeApi === 'zenex') {
+          response = await zenexApi.getNumber(range);
         } else {
           response = await mkApi.getNumber(range);
         }
@@ -397,12 +401,15 @@ bot.on('callback_query', async (query) => {
       if (ADMIN_ID && chatId !== ADMIN_ID) return bot.answerCallbackQuery(query.id, { text: '⛔ Not authorized' }).catch(() => {});
 
       const config = loadConfig();
-      const newApi = config.activeApi === 'mknetwork' ? 'nexaotp' : 'mknetwork';
+      const apis = ['mknetwork', 'nexaotp', 'zenex'];
+      const currentIndex = apis.indexOf(config.activeApi) !== -1 ? apis.indexOf(config.activeApi) : 0;
+      const newApi = apis[(currentIndex + 1) % apis.length];
       config.activeApi = newApi;
       saveConfig(config);
 
       const newLabel = getApiLabel(newApi);
-      const nextSwitch = newApi === 'mknetwork' ? 'NexaOTP' : 'MK Network';
+      const nextApi = apis[(currentIndex + 2) % apis.length];
+      const nextSwitch = getApiLabel(nextApi);
 
       bot.answerCallbackQuery(query.id, { text: `Switched to ${newLabel}` }).catch(() => {});
 
@@ -592,9 +599,12 @@ setInterval(async () => {
   // Separate pending numbers by API provider
   const mkPending = [];
   const nexaPending = [];
+  const zenexPending = [];
   for (const pNumber of pendingKeys) {
     if (pendingNumbers[pNumber].api === 'nexaotp') {
       nexaPending.push(pNumber);
+    } else if (pendingNumbers[pNumber].api === 'zenex') {
+      zenexPending.push(pNumber);
     } else {
       mkPending.push(pNumber);
     }
@@ -844,6 +854,116 @@ setInterval(async () => {
       }
     } catch (err) {
       console.error('NexaOTP Polling error:', err.message);
+    }
+  }
+
+  // --- Poll Zenex numbers ---
+  if (zenexPending.length > 0) {
+    try {
+      const result = await zenexApi.getHistory();
+      const history = result.data;
+
+      const recordMap = {};
+      for (const record of history) {
+        recordMap[record.phone_number] = record;
+      }
+
+      for (const pNumber of zenexPending) {
+        const record = recordMap[pNumber];
+        if (!record) continue;
+
+        const reqData = pendingNumbers[pNumber];
+        if (!reqData) continue;
+
+        if (record.status === 'success' && record.otps) {
+          const otpCount = record.otps.split('|||').length;
+          const knownCount = reqData.knownOtpCount || 0;
+
+          if (otpCount <= knownCount) continue;
+          if (reqData.successMsgId) {
+            try { await bot.deleteMessage(reqData.chatId, reqData.successMsgId); } catch (e) { /* ignore */ }
+          }
+
+          const allOtps = record.otps.split('|||');
+          const allSms = (record.full_sms_list || record.otps).split('|||');
+          
+          const newOtpsArr = allOtps.slice(knownCount).map((otp, index) => {
+            const sms = allSms.slice(knownCount)[index] || otp;
+            let cleanedOtp = otp.trim();
+            if (/[a-zA-Z]/.test(cleanedOtp) || cleanedOtp.length < 4) {
+              const match = sms.match(/(?:\b|\D)(\d{3})\s*(\d{3})(?:\b|\D)/);
+              if (match) {
+                cleanedOtp = match[1] + match[2];
+              } else {
+                const digitsMatch = sms.match(/\d{4,8}/);
+                if (digitsMatch) cleanedOtp = digitsMatch[0];
+              }
+            }
+            return cleanedOtp;
+          });
+          
+          const newOtps = newOtpsArr.join('|||');
+          const newSms = allSms.slice(knownCount).join('|||');
+
+          const newOtpCountForReward = otpCount - knownCount;
+          const pointsAwarded = newOtpCountForReward * 0.25;
+          const updatedBalance = await addBalance(reqData.chatId, pointsAwarded);
+
+          const flag = isoToFlag(reqData.iso);
+          const message = `📬 *OTP Received!*\n\n${flag} *Number:* \`${pNumber}\`\n🔑 *Code:* \`${newOtps}\`\n\n📝 *Full SMS:*\n\`${newSms}\`\n\n💰 *+${pointsAwarded} pts* (Balance: \`${updatedBalance}\`)`;
+
+          lastOtpNumbers[reqData.chatId] = {
+            number: pNumber,
+            range: reqData.range,
+            iso: reqData.iso,
+            api: reqData.api,
+            numberId: reqData.numberId || null,
+            lastOtpCount: otpCount
+          };
+
+          bot.sendMessage(reqData.chatId, message, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
+                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
+                ],
+                [
+                  { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
+                ]
+              ]
+            }
+          }).catch(e => console.error('[Zenex send] Error:', e.message));
+
+          if (OTP_GROUP_ID) {
+            const customMask = pNumber.length > 6 ? pNumber.substring(0, 3) + '****' + pNumber.slice(-3) : pNumber;
+            const flag = isoToFlag(reqData.iso) || '🏳';
+            const safeSms = newSms.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const groupMsg = `${flag} ${reqData.iso || 'N/A'} · ${customMask} · English\n<blockquote>${safeSms}</blockquote>`;
+            bot.sendMessage(OTP_GROUP_ID, groupMsg, {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
+                  [
+                    { text: '🤖 Bot', url: 'https://t.me/srfmk_bot', style: 'primary' },
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz908878', style: 'danger' }
+                  ]
+                ]
+              }
+            }).catch(() => {});
+          }
+
+          delete pendingNumbers[pNumber];
+        }
+        else if (record.status === 'canceled' || record.status === 'expired' || record.remaining_seconds <= 0) {
+          bot.sendMessage(reqData.chatId, `⚠️ Number \`${pNumber}\` has expired or was canceled.`, { parse_mode: 'Markdown' }).catch(() => {});
+          delete pendingNumbers[pNumber];
+        }
+      }
+    } catch (err) {
+      console.error('Zenex Polling error:', err.message);
     }
   }
 
