@@ -121,15 +121,29 @@ async function getHistory(page = 1, limit = 15) {
     if (response.data && response.data.meta && response.data.meta.status === 'success' && response.data.data) {
       const otps = response.data.data.otps || [];
       
-      const mappedData = otps.map(record => {
-        return {
-          phone_number: (record.number || '').replace('+', ''),
-          status: 'success',
-          otps: record.otp,
-          full_sms_list: record.otp,
-          remaining_seconds: 1800
-        };
-      });
+      const grouped = {};
+      for (const record of otps) {
+        const phone = (record.number || '').replace('+', '');
+        if (!phone) continue;
+        
+        if (!grouped[phone]) {
+          grouped[phone] = {
+            phone_number: phone,
+            status: 'success',
+            otps: [],
+            full_sms_list: [],
+            remaining_seconds: 1800
+          };
+        }
+        grouped[phone].otps.push(record.otp);
+        grouped[phone].full_sms_list.push(record.otp);
+      }
+
+      const mappedData = Object.values(grouped).map(g => ({
+        ...g,
+        otps: g.otps.join('|||'),
+        full_sms_list: g.full_sms_list.join('|||')
+      }));
 
       return {
         data: mappedData,
@@ -147,10 +161,35 @@ async function getConsoleLogs() {
   return [];
 }
 
+async function getActiveRanges() {
+  try {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error('No Zenex API key available. Check ZENEX_API_KEY in .env.');
+    }
+
+    const response = await axios.get(`${BASE_URL}/active-ranges`, {
+      headers: {
+        'mapikey': apiKey
+      },
+      timeout: 15000
+    });
+
+    if (response.data && response.data.success && response.data.data && response.data.data.active_ranges) {
+      return response.data.data.active_ranges;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching Zenex active ranges:', error.message);
+    return [];
+  }
+}
+
 module.exports = {
   getNumber,
   getHistory,
   startCookieRefreshLoop,
   getConsoleLogs,
+  getActiveRanges,
   countryToIso
 };
