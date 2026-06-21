@@ -1017,7 +1017,7 @@ setInterval(async () => {
   } finally {
     isOtpPolling = false;
   }
-}, 2000); // 2 seconds polling
+}, 1000); // 1 second polling
 
 // -----------------------------------------------------------------
 // Range Group Polling mechanism
