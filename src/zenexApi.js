@@ -81,7 +81,13 @@ async function getNumber(range) {
 
     if (data && data.meta && data.meta.status === 'success' && data.data) {
       const numData = data.data;
-      const iso = numData.iso ? numData.iso.toUpperCase() : countryToIso(numData.country);
+      
+      let iso = '';
+      if (numData.iso && numData.iso.toUpperCase() !== 'UNKNOWN') {
+        iso = numData.iso.toUpperCase();
+      } else if (numData.country && numData.country.toUpperCase() !== 'UNKNOWN') {
+        iso = countryToIso(numData.country);
+      }
       
       // Remove any '+' from the number for consistent tracking
       const cleanNumber = (numData.full_number || numData.number).replace('+', '');
