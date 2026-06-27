@@ -178,17 +178,6 @@ bot.onText(/\/start/, async (msg) => {
       ]
     }
   });
-
-  bot.sendMessage(chatId, 'Tap a button below to get started:', {
-    reply_markup: {
-      keyboard: [
-        [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }],
-        [{ text: '🛡️ Get 2FA', style: 'primary' }, { text: '🆘 Support', style: 'primary' }]
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
-    }
-  });
 });
 
 // -----------------------------------------------------------------
