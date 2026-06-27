@@ -168,10 +168,18 @@ bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const balance = await getBalance(chatId);
 
-  const welcome = `Welcome to the *SRF Number Bot!* 🚀\n\n💰 *Your Balance:* \`${balance}\` points\n\nTap a button below to get started:`;
+  const welcome = `Welcome to the *PREMIUM NUMBER BOT!* 🚀\n\n💰 *Your Balance:* \`${balance}\` points`;
 
-  bot.sendMessage(chatId, welcome, {
+  await bot.sendMessage(chatId, welcome, {
     parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '📢 Active Range', url: 'https://t.me/srfranges' }]
+      ]
+    }
+  });
+
+  bot.sendMessage(chatId, 'Tap a button below to get started:', {
     reply_markup: {
       keyboard: [
         [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }],
