@@ -613,11 +613,15 @@ setInterval(async () => {
   // If there are no pending numbers, don't spam the API
   if (pendingKeys.length === 0) return;
 
+  const activeApi = getActiveApi();
+
   // Separate pending numbers by API provider
   const mkPending = [];
   const nexaPending = [];
   const zenexPending = [];
   for (const pNumber of pendingKeys) {
+    if (pendingNumbers[pNumber].api !== activeApi) continue;
+
     if (pendingNumbers[pNumber].api === 'nexaotp') {
       nexaPending.push(pNumber);
     } else if (pendingNumbers[pNumber].api === 'zenex') {
