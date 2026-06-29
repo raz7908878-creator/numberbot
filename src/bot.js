@@ -562,7 +562,7 @@ bot.on('message', async (msg) => {
     }
     // Extract unique services
     const services = [...new Set(cachedActiveRanges.map(r => r.service))];
-    const serviceEmojis = { 'facebook': '📘', 'instagram': '📸', 'telegram': '✈️', 'whatsapp': '💬', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🎬', 'google': '🔍', 'snapchat': '👻' };
+    const serviceEmojis = { 'facebook': '🔵', 'instagram': '📷', 'telegram': '✈️', 'whatsapp': '🟢', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🔴', 'google': '🔍', 'snapchat': '👻' };
     const keyboard = services.map(s => {
       const emoji = serviceEmojis[s.toLowerCase()] || '📱';
       return [{ text: `${emoji} ${s}`, callback_data: `service:${s}` }];
