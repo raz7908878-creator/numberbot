@@ -7,6 +7,7 @@ const nexaApi = require('./nexaApi');
 const zenexApi = require('./zenexApi');
 const { getBalance, setBalance, addBalance, getAllBalances } = require('./balance');
 const { TOTP } = require('totp-generator');
+const { getIsoFromRange, getCountryFromIso } = require('./countryCodes');
 
 const awaiting2fa = {};
 // -----------------------------------------------------------------
@@ -34,7 +35,7 @@ if (!token) {
 }
 
 if (!process.env.MK_LOGIN_ID || !process.env.MK_PASSWORD) {
-  console.warn('WARNING: MK_LOGIN_ID or MK_PASSWORD not set. Cookie auto-refresh will not work.');
+  // Warning suppressed: MK_LOGIN_ID or MK_PASSWORD not set
 }
 
 // Start background cookie refresh (immediate + every 5 minutes)
@@ -119,42 +120,23 @@ function detectLanguage(text) {
 }
 
 // -----------------------------------------------------------------
-// Live Range Cache (populated from range group polling)
+// Active Ranges Cache (polled every 5 minutes)
 // -----------------------------------------------------------------
-// liveRanges: { "Guinea": [ { range, carrier, app, iso, timestamp }, ... ], ... }
-const liveRanges = {};
-const LIVE_RANGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let cachedActiveRanges = [];
 
-function addLiveRange(country, range, carrier, app, iso) {
-  if (!liveRanges[country]) liveRanges[country] = [];
-  liveRanges[country].push({ range, carrier, app, iso, timestamp: Date.now() });
-  // Keep max 50 entries per country to prevent memory leak
-  if (liveRanges[country].length > 50) {
-    liveRanges[country] = liveRanges[country].slice(-50);
+async function refreshActiveRanges() {
+  try {
+    cachedActiveRanges = await zenexApi.getActiveRanges();
+    // Refresh logged silently
+  } catch (err) {
+    console.error('[Active Ranges] Refresh error:', err.message);
   }
 }
 
-function getLiveCountries() {
-  const cutoff = Date.now() - LIVE_RANGE_TTL_MS;
-  const results = [];
-  for (const country of Object.keys(liveRanges)) {
-    const recent = liveRanges[country].filter(r => r.timestamp > cutoff);
-    if (recent.length > 0) {
-      // Most recent entry for flag/iso
-      const latest = recent[recent.length - 1];
-      results.push({ country, count: recent.length, iso: latest.iso, range: latest.range });
-    }
-  }
-  return results.sort((a, b) => b.count - a.count);
-}
-
-function getBestRange(country) {
-  const cutoff = Date.now() - LIVE_RANGE_TTL_MS;
-  const entries = (liveRanges[country] || []).filter(r => r.timestamp > cutoff);
-  if (entries.length === 0) return null;
-  // Return the most recent range
-  return entries[entries.length - 1];
-}
+// Initial fetch on startup
+refreshActiveRanges();
+// Poll every 5 minutes
+setInterval(refreshActiveRanges, 1 * 60 * 1000);
 
 // -----------------------------------------------------------------
 // Balance / Points persistence
@@ -173,9 +155,12 @@ bot.onText(/\/start/, async (msg) => {
   await bot.sendMessage(chatId, welcome, {
     parse_mode: 'Markdown',
     reply_markup: {
-      inline_keyboard: [
-        [{ text: '📢 Active Range', url: 'https://t.me/srfranges' }]
-      ]
+      keyboard: [
+        [{ text: '📲 Get Number', style: 'primary' }, { text: '📡 Live Traffic', style: 'primary' }],
+        [{ text: '🛡️ Get 2FA', style: 'primary' }, { text: '🆘 Support', style: 'primary' }]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
     }
   });
 });
@@ -183,7 +168,7 @@ bot.onText(/\/start/, async (msg) => {
 // -----------------------------------------------------------------
 // /admin command
 // -----------------------------------------------------------------
-bot.onText(/\/admin/, (msg) => {
+bot.onText(/\/admin/, async (msg) => {
   const chatId = msg.chat.id;
 
   if (ADMIN_ID && chatId !== ADMIN_ID) {
@@ -191,15 +176,20 @@ bot.onText(/\/admin/, (msg) => {
   }
 
   if (!ADMIN_ID) {
-    console.warn(`Admin command used by ${chatId}. Set ADMIN_ID=${chatId} in .env to restrict.`);
+    // Admin command used without ADMIN_ID restriction
   }
 
   const activeApi = getActiveApi();
   const apiLabel = getApiLabel(activeApi);
-  const liveCountries = getLiveCountries();
-  const liveList = liveCountries.length > 0
-    ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
-    : '_No live ranges right now._';
+  const activeRanges = await zenexApi.getActiveRanges();
+  const liveList = activeRanges.length > 0
+    ? activeRanges.map(r => {
+        const iso = getIsoFromRange(r.range);
+        const flag = isoToFlag(iso) || '🏳️';
+        const country = getCountryFromIso(iso) || 'Unknown';
+        return `${flag} ${country} · ${r.range} (${r.service}) — ${r.hits} hits`;
+      }).join('\n')
+    : '_No active ranges right now._';
 
   bot.sendMessage(chatId,
     `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${apiLabel}\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
@@ -282,10 +272,9 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
           inline_keyboard: [
             [
               { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
-              { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
             ],
             [
-              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'success' }
+              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'primary' }
             ]
           ]
         }
@@ -328,18 +317,12 @@ bot.on('callback_query', async (query) => {
   try {
     const chatId = query.message.chat.id;
 
-    // --- User: Select a country to get number ---
-    if (query.data.startsWith('country:')) {
-      const country = query.data.substring(8);
+    // --- User: Select a range to get number ---
+    if (query.data.startsWith('range:')) {
+      const range = query.data.substring(6);
       bot.answerCallbackQuery(query.id).catch(() => {});
-      // Delete the country selection message (fire-and-forget, don't wait)
       bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-      const best = getBestRange(country);
-      if (!best) {
-        bot.sendMessage(chatId, `⚠️ No live ranges for *${country}* right now. Try again in a moment.`, { parse_mode: 'Markdown' }).catch(() => {});
-        return;
-      }
-      await fetchNumberForUser(chatId, best.range);
+      await fetchNumberForUser(chatId, range);
     }
     // --- User: Change number (from success msg - delete old) ---
     else if (query.data.startsWith('change_number:')) {
@@ -391,10 +374,9 @@ bot.on('callback_query', async (query) => {
           inline_keyboard: [
             [
               { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}`, style: 'success' },
-              { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
             ],
             [
-              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'success' }
+              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'primary' }
             ]
           ]
         }
@@ -431,10 +413,15 @@ bot.on('callback_query', async (query) => {
       bot.answerCallbackQuery(query.id, { text: `Switched to ${newLabel}` }).catch(() => {});
 
       // Update the admin panel message in-place
-      const liveCountries = getLiveCountries();
-      const liveList = liveCountries.length > 0
-        ? liveCountries.map(c => `${isoToFlag(c.iso)} ${c.country} — ${c.count} range(s)`).join('\n')
-        : '_No live ranges right now._';
+      const activeRanges = await zenexApi.getActiveRanges();
+      const liveList = activeRanges.length > 0
+        ? activeRanges.map(r => {
+            const iso = getIsoFromRange(r.range);
+            const flag = isoToFlag(iso) || '🏳️';
+            const country = getCountryFromIso(iso) || 'Unknown';
+            return `${flag} ${country} · ${r.range} (${r.service}) — ${r.hits} hits`;
+          }).join('\n')
+        : '_No active ranges right now._';
 
       bot.editMessageText(
         `⚙️ *Admin Panel*\n\n🔌 *Active API:* ${newLabel} ✅\n\n📡 *Live Ranges (last 5 min):*\n${liveList}\n\nUse the buttons below to manage:`, {
@@ -548,32 +535,35 @@ bot.on('message', async (msg) => {
   }
 
   // --- Reply Keyboard: Get Number ---
-  if (text === '📲 Get Number' || text === '📲 Get Number') {
-    const countries = getLiveCountries();
-    if (countries.length === 0) {
-      return bot.sendMessage(chatId, '😔 No live ranges available right now.\n\n_Ranges appear here automatically when new ones drop in the range group. Try again in a moment._', { parse_mode: 'Markdown' }).catch(() => {});
+  if (text === '📲 Get Number' || text === '☎️ Get Number') {
+    if (cachedActiveRanges.length === 0) {
+      return bot.sendMessage(chatId, '📭 No live ranges available right now.\n\n_Try again in a moment._', { parse_mode: 'Markdown' }).catch(() => {});
     }
-    const keyboard = countries.map(c => {
-      const flag = isoToFlag(c.iso) || '🌍';
-      return [{ text: `${flag} ${c.country} (${c.count})`, callback_data: `country:${c.country}` }];
+    const keyboard = cachedActiveRanges.map(r => {
+      const iso = getIsoFromRange(r.range);
+      const flag = isoToFlag(iso) || '🏳️';
+      const country = getCountryFromIso(iso) || 'Unknown';
+      return [{ text: `${flag} ${country} · ${r.range}`, callback_data: `range:${r.range}` }];
     });
-    return bot.sendMessage(chatId, '🌍 *Select a country to get a number:*', {
+    return bot.sendMessage(chatId, '🌍 *Select a range to get a number:*', {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard }
     }).catch(() => {});
   }
 
   // --- Reply Keyboard: Live Traffic ---
-  if (text === '📡 Live Traffic' || text === '📡 Live Traffic') {
-    const countries = getLiveCountries();
-    if (countries.length === 0) {
-      return bot.sendMessage(chatId, '📡 *Live Traffic*\n\n_No live traffic in the last 5 minutes._\n\nNew ranges will appear here automatically when they drop.', { parse_mode: 'Markdown' }).catch(() => {});
+  if (text === '📡 Live Traffic') {
+    const activeRanges = await zenexApi.getActiveRanges();
+    if (activeRanges.length === 0) {
+      return bot.sendMessage(chatId, '📭 No live traffic available right now.', { parse_mode: 'Markdown' }).catch(() => {});
     }
-    const lines = countries.map(c => {
-      const flag = isoToFlag(c.iso) || '🌍';
-      return `${flag} *${c.country}* — \`${c.count}\` range(s)\n    └ Latest: \`${c.range}\``;
+    const lines = activeRanges.map(r => {
+      const iso = getIsoFromRange(r.range);
+      const flag = isoToFlag(iso) || '🏳️';
+      const country = getCountryFromIso(iso) || 'Unknown';
+      return `${flag} *${country}* · ${r.range} (${r.service}) - \`${r.hits}\` hits`;
     });
-    return bot.sendMessage(chatId, `📡 *Live Traffic (last 5 min)*\n\n${lines.join('\n\n')}`, { parse_mode: 'Markdown' }).catch(() => {});
+    return bot.sendMessage(chatId, `📡 *Live Traffic*\n\n${lines.join('\n')}`, { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   // Admin: waiting for new balance amount
@@ -712,7 +702,6 @@ setInterval(async () => {
               inline_keyboard: [
                 [
                   { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
-                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
@@ -836,7 +825,6 @@ setInterval(async () => {
               inline_keyboard: [
                 [
                   { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
-                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
@@ -950,7 +938,6 @@ setInterval(async () => {
               inline_keyboard: [
                 [
                   { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
-                  { text: '📊 Active Ranges', url: 'https://t.me/srfranges', style: 'primary' }
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
@@ -1006,10 +993,7 @@ setInterval(async () => {
       bot.sendMessage(reqData.chatId, `⏰ *Timeout!* Number \`${pNumber}\` has been unassigned after 10 minutes with no OTP.`, {
         parse_mode: 'Markdown',
         reply_markup: {
-          inline_keyboard: [
-            [{ text: '📊 Active Range', url: 'https://t.me/srfranges' }]
-          ]
-        }
+          inline_keyboard: [] }
       }).catch(() => {});
       delete pendingNumbers[pNumber];
     }
@@ -1021,105 +1005,9 @@ setInterval(async () => {
 }, 1000); // 1 second polling
 
 // -----------------------------------------------------------------
-// Range Group Polling mechanism
-// -----------------------------------------------------------------
-const RANGE_GROUP_ID = process.env.RANGE_GROUP_ID || null;
-const processedLogIds = new Set();
-let isFirstRangePoll = true;
 
-let isRangePolling = false;
 
-if (RANGE_GROUP_ID) {
-  setInterval(async () => {
-    if (isRangePolling) return;
-    isRangePolling = true;
-
-    try {
-      const logs = await nexaApi.getConsoleLogs();
-
-      if (logs.length === 0) {
-        isRangePolling = false;
-        return;
-      }
-
-      if (isFirstRangePoll) {
-        logs.forEach(log => {
-          const logId = log.id || `${log.number}_${log.time}_${log.otp}`;
-          processedLogIds.add(logId);
-        });
-        isFirstRangePoll = false;
-        console.log(`[Range Group] Initialized with ${logs.length} logs ignored.`);
-        isRangePolling = false;
-        return;
-      }
-
-      // Process from oldest to newest in the batch
-      for (let i = logs.length - 1; i >= 0; i--) {
-        const log = logs[i];
-        
-        // Filter: only show messages with Facebook
-        if (!log.app_name || log.app_name.toLowerCase() !== 'facebook') continue;
-
-        const logId = log.id || `${log.number}_${log.time}_${log.otp}`;
-        
-        if (!processedLogIds.has(logId)) {
-          processedLogIds.add(logId);
-
-          if (processedLogIds.size > 1000) {
-            const it = processedLogIds.values();
-            processedLogIds.delete(it.next().value);
-          }
-
-          const iso = nexaApi.countryToIso(log.country);
-          const flag = isoToFlag(iso) || '🌍';
-          
-          // Format range to show first 7 digits and pad with 6 'X's
-          const rawNumber = log.number || '';
-          const rangeStr = rawNumber.length >= 7 ? rawNumber.substring(0, 7) + 'XXXXXX' : rawNumber;
-
-          // Cache this range for Get Number / Live Traffic
-          addLiveRange(log.country, rangeStr, log.carrier, log.app_name, iso);
-
-          const message = `🌟 *New Range Dropped*\n\n` +
-                          `📱 *App:* ${log.app_name}\n` +
-                          `${flag} *Country:* ${log.country}\n` +
-                          `📶 *Carrier:* ${log.carrier}\n\n` +
-                          `🎯 *Range (Tap to copy):*\n` +
-                          `\`${rangeStr}\`\n\n` +
-                          `🔑 *OTP:* \`******\`\n\n` +
-                          `*Bot :* @srfmk\\_bot`;
-
-          let msgSent = false;
-          let retries = 0;
-          while (!msgSent && retries < 3) {
-            try {
-              await rangeBot.sendMessage(RANGE_GROUP_ID, message, { parse_mode: 'Markdown' });
-              msgSent = true;
-            } catch (e) {
-              if (e.response && e.response.statusCode === 429) {
-                const retryAfter = e.response.body.parameters.retry_after || 5;
-                console.warn(`[Range Group] Rate limited. Retrying after ${retryAfter}s...`);
-                await new Promise(r => setTimeout(r, retryAfter * 1000));
-                retries++;
-              } else {
-                console.error('[Range Group] Error sending message:', e.message);
-                break; // Break on non-429 errors
-              }
-            }
-          }
-          // Delay MUST be outside try/catch so it always waits to respect group limits (~20 msgs/min)
-          await new Promise(r => setTimeout(r, 3500));
-        }
-      }
-    } catch (err) {
-      console.error('[Range Group] Polling error:', err.message);
-    } finally {
-      isRangePolling = false;
-    }
-  }, 3000); // 3 seconds polling
-}
-
-console.log('Bot is running natively with Background OTP Polling...');
+// Bot started silently
 
 // -----------------------------------------------------------------
 // Dummy Web Server for Render
@@ -1133,5 +1021,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Web server listening on port ${PORT} (for Render health checks)`);
+  // Web server started on ${PORT}
 });
