@@ -562,11 +562,16 @@ bot.on('message', async (msg) => {
     }
     // Extract unique services
     const services = [...new Set(cachedActiveRanges.map(r => r.service))];
-    const serviceEmojis = { 'facebook': '🔵', 'instagram': '📷', 'telegram': '✈️', 'whatsapp': '🟢', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🔴', 'google': '🔍', 'snapchat': '👻' };
-    const keyboard = services.map(s => {
+    const serviceEmojis = { 'facebook': '🔵', 'instagram': '📸', 'telegram': '✈️', 'whatsapp': '🟢', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🔴', 'google': '🔍', 'snapchat': '👻' };
+    const buttons = services.map(s => {
       const emoji = serviceEmojis[s.toLowerCase()] || '📱';
-      return [{ text: `${emoji} ${s}`, callback_data: `service:${s}` }];
+      return { text: `${emoji} ${s}`, callback_data: `service:${s}` };
     });
+    // Group into rows of 2
+    const keyboard = [];
+    for (let i = 0; i < buttons.length; i += 2) {
+      keyboard.push(buttons.slice(i, i + 2));
+    }
     return bot.sendMessage(chatId, '📲 *Select a service:*', {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard }
