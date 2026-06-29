@@ -55,8 +55,8 @@ function loadConfig() {
   try {
     const data = fs.readFileSync(CONFIG_FILE, 'utf8');
     return JSON.parse(data);
-  } catch (e) {
-    return { activeApi: 'mknetwork' };
+  } catch (err) {
+    return { activeApi: 'zenex' };
   }
 }
 
@@ -66,7 +66,7 @@ function saveConfig(config) {
 }
 
 function getActiveApi() {
-  return loadConfig().activeApi || 'mknetwork';
+  return loadConfig().activeApi || 'zenex';
 }
 
 function getApiLabel(api) {
