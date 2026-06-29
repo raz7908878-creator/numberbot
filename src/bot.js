@@ -317,8 +317,29 @@ bot.on('callback_query', async (query) => {
   try {
     const chatId = query.message.chat.id;
 
+    // --- User: Select a service to filter ranges ---
+    if (query.data.startsWith('service:')) {
+      const service = query.data.substring(8);
+      bot.answerCallbackQuery(query.id).catch(() => {});
+      bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+
+      const filtered = cachedActiveRanges.filter(r => r.service.toLowerCase() === service.toLowerCase());
+      if (filtered.length === 0) {
+        return bot.sendMessage(chatId, `📭 No live ranges for *${service}* right now.`, { parse_mode: 'Markdown' }).catch(() => {});
+      }
+      const keyboard = filtered.map(r => {
+        const iso = getIsoFromRange(r.range);
+        const flag = isoToFlag(iso) || '🏳️';
+        const country = getCountryFromIso(iso) || 'Unknown';
+        return [{ text: `${flag} ${country} · ${r.range}`, callback_data: `range:${r.range}` }];
+      });
+      return bot.sendMessage(chatId, `🌍 *Select a range for ${service}:*`, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      }).catch(() => {});
+    }
     // --- User: Select a range to get number ---
-    if (query.data.startsWith('range:')) {
+    else if (query.data.startsWith('range:')) {
       const range = query.data.substring(6);
       bot.answerCallbackQuery(query.id).catch(() => {});
       bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
@@ -539,13 +560,14 @@ bot.on('message', async (msg) => {
     if (cachedActiveRanges.length === 0) {
       return bot.sendMessage(chatId, '📭 No live ranges available right now.\n\n_Try again in a moment._', { parse_mode: 'Markdown' }).catch(() => {});
     }
-    const keyboard = cachedActiveRanges.map(r => {
-      const iso = getIsoFromRange(r.range);
-      const flag = isoToFlag(iso) || '🏳️';
-      const country = getCountryFromIso(iso) || 'Unknown';
-      return [{ text: `${flag} ${country} · ${r.range}`, callback_data: `range:${r.range}` }];
+    // Extract unique services
+    const services = [...new Set(cachedActiveRanges.map(r => r.service))];
+    const serviceEmojis = { 'facebook': '📘', 'instagram': '📸', 'telegram': '✈️', 'whatsapp': '💬', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🎬', 'google': '🔍', 'snapchat': '👻' };
+    const keyboard = services.map(s => {
+      const emoji = serviceEmojis[s.toLowerCase()] || '📱';
+      return [{ text: `${emoji} ${s}`, callback_data: `service:${s}` }];
     });
-    return bot.sendMessage(chatId, '🌍 *Select a range to get a number:*', {
+    return bot.sendMessage(chatId, '📲 *Select a service:*', {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard }
     }).catch(() => {});
