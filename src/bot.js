@@ -562,10 +562,14 @@ bot.on('message', async (msg) => {
     }
     // Extract unique services
     const services = [...new Set(cachedActiveRanges.map(r => r.service))];
-    const serviceEmojis = { 'facebook': '🔵', 'instagram': '📸', 'telegram': '✈️', 'whatsapp': '🟢', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🔴', 'google': '🔍', 'snapchat': '👻' };
+    const serviceEmojis = { 'facebook': '🔵', 'instagram': '📷', 'telegram': '✈️', 'whatsapp': '🟢', 'tiktok': '🎵', 'twitter': '🐦', 'netflix': '🔴', 'google': '🔍', 'snapchat': '👻' };
+    const serviceStyles = { 'facebook': 'primary', 'instagram': 'danger' };
     const buttons = services.map(s => {
       const emoji = serviceEmojis[s.toLowerCase()] || '📱';
-      return { text: `${emoji} ${s}`, callback_data: `service:${s}` };
+      const style = serviceStyles[s.toLowerCase()];
+      const btn = { text: `${emoji} ${s}`, callback_data: `service:${s}` };
+      if (style) btn.style = style;
+      return btn;
     });
     // Group into rows of 2
     const keyboard = [];
