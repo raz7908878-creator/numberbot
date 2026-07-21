@@ -2,7 +2,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const querystring = require('querystring');
 
-const API_URL = 'https://mknetworkbd.com/API/api_handler_test.php';
+const API_URL = 'https://mknetworkbd.com/API/api_handler.php';
 const LOGIN_URL = 'https://mknetworkbd.com/login.php';
 
 // -----------------------------------------------------------------
@@ -163,15 +163,16 @@ async function getNumber(range) {
       'accept-language': 'en-GB,en;q=0.5',
       'cookie': cookie,
       'origin': 'https://mknetworkbd.com',
-      'referer': 'https://mknetworkbd.com/getnum.php',
-      'sec-ch-ua': '"Brave";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"Windows"',
+      'priority': 'u=1, i',
+      'referer': 'https://mknetworkbd.com/getnum_test.php',
+      'sec-ch-ua': '"Not;A=Brand";v="8", "Chromium";v="150", "Brave";v="150"',
+      'sec-ch-ua-mobile': '?1',
+      'sec-ch-ua-platform': '"Android"',
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
       'sec-gpc': '1',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36'
+      'user-agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36'
     };
 
     const response = await axios.post(API_URL, form, { headers });
