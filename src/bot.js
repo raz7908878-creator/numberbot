@@ -268,7 +268,8 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
         response.iso = getIsoFromRange(response.number.replace('+', ''));
       }
       const flag = isoToFlag(response.iso);
-      const message = `✅ *Success!*\n\n*ISO:* ${flag} ${response.iso || 'N/A'}\n\n⏳ _Waiting for SMS..._`;
+      const countryName = getCountryFromIso(response.iso) || response.iso || 'Unknown';
+      const message = `${flag} *${countryName} Number Assigned:*\n\n⏳ _Waiting for SMS..._`;
       const successMsg = await bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -364,13 +365,13 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
 
     // Check final result
     if (successfulNumbers.length > 0) {
-      let message = `✅ *Success! Fetched ${successfulNumbers.length} numbers:*\n\n`;
       let commonIso = successfulNumbers[0].iso || 'N/A';
       const commonFlag = isoToFlag(commonIso);
+      const countryName = getCountryFromIso(commonIso) || commonIso || 'Unknown';
       
-      message += `*ISO:* ${commonFlag} ${commonIso}\n\n⏳ _Waiting for SMS..._`;
+      const message = `${commonFlag} *${countryName} Numbers Assigned:*\n\n⏳ _Waiting for SMS..._`;
 
-      const numberButtons = successfulNumbers.map((resp, index) => {
+      const numberButtons = successfulNumbers.map((resp) => {
         const flag = isoToFlag(resp.iso);
         return [{ text: `${flag} ${resp.number}`, copy_text: { text: resp.number } }];
       });
@@ -504,7 +505,8 @@ bot.on('callback_query', async (query) => {
       unassignPendingForChat(chatId);
 
       const flag = isoToFlag(lastData.iso);
-      const restoreMsg = `🔁 *Number Restored!*\n\n*ISO:* ${flag} ${lastData.iso || 'N/A'}\n\n⏳ _Waiting for new SMS..._`;
+      const countryName = getCountryFromIso(lastData.iso) || lastData.iso || 'Unknown';
+      const restoreMsg = `${flag} *${countryName} Number Assigned:*\n\n⏳ _Waiting for new SMS..._`;
       const successMsg = await bot.sendMessage(chatId, restoreMsg, {
         parse_mode: 'Markdown',
         reply_markup: {
