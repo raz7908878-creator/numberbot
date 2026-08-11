@@ -382,7 +382,6 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
           inline_keyboard: [
             ...numberButtons,
             [
-              { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
               { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${range}`, style: 'success' }
             ],
             [
@@ -453,14 +452,14 @@ bot.on('callback_query', async (query) => {
       const range = query.data.substring(6);
       bot.answerCallbackQuery(query.id).catch(() => {});
       bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
-      await fetchNumberForUser(chatId, range);
+      await fetchMultipleNumbersForUser(chatId, range, 3);
     }
     // --- User: Change number (from success msg - delete old) ---
     else if (query.data.startsWith('change_number:')) {
       const range = query.data.split(':')[1];
       const oldMessageId = query.message.message_id;
       bot.answerCallbackQuery(query.id).catch(() => {});
-      await fetchNumberForUser(chatId, range, [oldMessageId]);
+      await fetchMultipleNumbersForUser(chatId, range, 3, [oldMessageId]);
     }
     // --- User: Change 3 numbers (from success msg) ---
     else if (query.data.startsWith('change_3_numbers:')) {
@@ -480,7 +479,7 @@ bot.on('callback_query', async (query) => {
           message_id: query.message.message_id
         });
       } catch (e) { /* ignore */ }
-      await fetchNumberForUser(chatId, range);
+      await fetchMultipleNumbersForUser(chatId, range, 3);
     }
     // --- User: Restore last number (re-add to pending for another OTP) ---
     else if (query.data.startsWith('restore_last:')) {
@@ -515,7 +514,6 @@ bot.on('callback_query', async (query) => {
               { text: `${flag} ${number}`, copy_text: { text: number } }
             ],
             [
-              { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}`, style: 'success' },
               { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${lastData.range}`, style: 'success' }
             ],
             [
@@ -735,7 +733,7 @@ bot.on('message', async (msg) => {
   // Ranges typically contain digits and X characters
   const trimmed = text.trim();
   if (/^[\dXx]{6,}$/.test(trimmed)) {
-    await fetchNumberForUser(chatId, trimmed);
+    await fetchMultipleNumbersForUser(chatId, trimmed, 3);
   }
 });
 
@@ -852,7 +850,7 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
+                  { text: '🔄 Change 3 Numbers', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
@@ -973,7 +971,7 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
+                  { text: '🔄 Change 3 Numbers', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
@@ -1085,7 +1083,7 @@ setInterval(async () => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '🔄 Change Number', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
+                  { text: '🔄 Change 3 Numbers', callback_data: `change_from_otp:${reqData.range}`, style: 'success' },
                 ],
                 [
                   { text: '🔁 Restore Last Number', callback_data: `restore_last:${pNumber}`, style: 'danger' }
