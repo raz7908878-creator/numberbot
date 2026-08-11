@@ -265,11 +265,14 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
     // Check final result
     if (response && response.status === 'success' && response.number) {
       const flag = isoToFlag(response.iso);
-      const message = `✅ *Success!*\n\n${flag} *Number:* \`${response.number}\`\n*ISO:* ${response.iso || 'N/A'}\n\n⏳ _Waiting for SMS..._`;
+      const message = `✅ *Success!*\n\n*ISO:* ${response.iso || 'N/A'}\n\n⏳ _Waiting for SMS..._`;
       const successMsg = await bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
+            [
+              { text: `${flag} ${response.number}`, copy_text: { text: response.number } }
+            ],
             [
               { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
               { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${range}`, style: 'success' }
@@ -358,16 +361,18 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
       let message = `✅ *Success! Fetched ${successfulNumbers.length} numbers:*\n\n`;
       let commonIso = successfulNumbers[0].iso || 'N/A';
       
-      successfulNumbers.forEach((resp, index) => {
+      message += `*ISO:* ${commonIso}\n\n⏳ _Waiting for SMS..._`;
+
+      const numberButtons = successfulNumbers.map((resp, index) => {
         const flag = isoToFlag(resp.iso);
-        message += `${flag} *Number ${index + 1}:* \`${resp.number}\`\n`;
+        return [{ text: `${flag} Number ${index + 1}: ${resp.number}`, copy_text: { text: resp.number } }];
       });
-      message += `\n*ISO:* ${commonIso}\n\n⏳ _Waiting for SMS..._`;
 
       const successMsg = await bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
+            ...numberButtons,
             [
               { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
               { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${range}`, style: 'success' }
@@ -492,11 +497,14 @@ bot.on('callback_query', async (query) => {
       unassignPendingForChat(chatId);
 
       const flag = isoToFlag(lastData.iso);
-      const restoreMsg = `🔁 *Number Restored!*\n\n${flag} *Number:* \`${number}\`\n*ISO:* ${lastData.iso || 'N/A'}\n\n⏳ _Waiting for new SMS..._`;
+      const restoreMsg = `🔁 *Number Restored!*\n\n*ISO:* ${lastData.iso || 'N/A'}\n\n⏳ _Waiting for new SMS..._`;
       const successMsg = await bot.sendMessage(chatId, restoreMsg, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
+            [
+              { text: `${flag} ${number}`, copy_text: { text: number } }
+            ],
             [
               { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}`, style: 'success' },
               { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${lastData.range}`, style: 'success' }
