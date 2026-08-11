@@ -264,6 +264,9 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
 
     // Check final result
     if (response && response.status === 'success' && response.number) {
+      if (!response.iso) {
+        response.iso = getIsoFromRange(response.number.replace('+', ''));
+      }
       const flag = isoToFlag(response.iso);
       const message = `✅ *Success!*\n\n*ISO:* ${response.iso || 'N/A'}\n\n⏳ _Waiting for SMS..._`;
       const successMsg = await bot.sendMessage(chatId, message, {
@@ -334,6 +337,9 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
           }
 
           if (response && response.status === 'success' && response.number) {
+            if (!response.iso) {
+              response.iso = getIsoFromRange(response.number.replace('+', ''));
+            }
             successfulNumbers.push(response);
             break; // Success for this number, move to next
           }
@@ -365,7 +371,7 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
 
       const numberButtons = successfulNumbers.map((resp, index) => {
         const flag = isoToFlag(resp.iso);
-        return [{ text: `${flag} Number ${index + 1}: ${resp.number}`, copy_text: { text: resp.number } }];
+        return [{ text: `${flag} ${resp.number}`, copy_text: { text: resp.number } }];
       });
 
       const successMsg = await bot.sendMessage(chatId, message, {
