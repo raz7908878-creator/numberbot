@@ -268,7 +268,7 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
         response.iso = getIsoFromRange(response.number.replace('+', ''));
       }
       const flag = isoToFlag(response.iso);
-      const message = `✅ *Success!*\n\n*ISO:* ${response.iso || 'N/A'}\n\n⏳ _Waiting for SMS..._`;
+      const message = `✅ *Success!*\n\n*ISO:* ${flag} ${response.iso || 'N/A'}\n\n⏳ _Waiting for SMS..._`;
       const successMsg = await bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -366,8 +366,9 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
     if (successfulNumbers.length > 0) {
       let message = `✅ *Success! Fetched ${successfulNumbers.length} numbers:*\n\n`;
       let commonIso = successfulNumbers[0].iso || 'N/A';
+      const commonFlag = isoToFlag(commonIso);
       
-      message += `*ISO:* ${commonIso}\n\n⏳ _Waiting for SMS..._`;
+      message += `*ISO:* ${commonFlag} ${commonIso}\n\n⏳ _Waiting for SMS..._`;
 
       const numberButtons = successfulNumbers.map((resp, index) => {
         const flag = isoToFlag(resp.iso);
@@ -503,7 +504,7 @@ bot.on('callback_query', async (query) => {
       unassignPendingForChat(chatId);
 
       const flag = isoToFlag(lastData.iso);
-      const restoreMsg = `🔁 *Number Restored!*\n\n*ISO:* ${lastData.iso || 'N/A'}\n\n⏳ _Waiting for new SMS..._`;
+      const restoreMsg = `🔁 *Number Restored!*\n\n*ISO:* ${flag} ${lastData.iso || 'N/A'}\n\n⏳ _Waiting for new SMS..._`;
       const successMsg = await bot.sendMessage(chatId, restoreMsg, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -639,7 +640,7 @@ bot.on('message', async (msg) => {
     return bot.sendMessage(chatId, 'Need help? Contact our admin for support!', {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🧑‍💻 Contact Admin', url: 'https://t.me/raz908878', style: 'primary' }]
+          [{ text: '🧑‍💻 Contact Admin', url: 'https://t.me/raz7ftbl', style: 'primary' }]
         ]
       }
     });
@@ -872,7 +873,7 @@ setInterval(async () => {
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
                   [
                     { text: '🤖 Bot', url: 'https://t.me/srfmk_bot', style: 'primary' },
-                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz908878', style: 'danger' }
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz7ftbl', style: 'danger' }
                   ]
                 ]
               }
@@ -993,7 +994,7 @@ setInterval(async () => {
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
                   [
                     { text: '🤖 Bot', url: 'https://t.me/srfmk_bot', style: 'primary' },
-                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz908878', style: 'danger' }
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz7ftbl', style: 'danger' }
                   ]
                 ]
               }
@@ -1104,7 +1105,7 @@ setInterval(async () => {
                   [{ text: `🔑 ${newOtps}`, copy_text: { text: newOtps }, style: 'success' }],
                   [
                     { text: '🤖 Bot', url: 'https://t.me/srfmk_bot', style: 'primary' },
-                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz908878', style: 'danger' }
+                    { text: '🧑‍💻 Developer', url: 'https://t.me/raz7ftbl', style: 'danger' }
                   ]
                 ]
               }
