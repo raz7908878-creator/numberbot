@@ -268,7 +268,7 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
         response.iso = getIsoFromRange(response.number.replace('+', ''));
       }
       const flag = isoToFlag(response.iso);
-      const message = `\u3164`;
+      const message = `📱`;
       const successMsg = await bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -367,7 +367,7 @@ async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToD
       let commonIso = successfulNumbers[0].iso || 'N/A';
       const commonFlag = isoToFlag(commonIso);
       
-      let message = `\u3164`;
+      let message = `📱`;
 
       const numberButtons = successfulNumbers.map((resp, index) => {
         const flag = isoToFlag(resp.iso);
@@ -503,7 +503,7 @@ bot.on('callback_query', async (query) => {
       unassignPendingForChat(chatId);
 
       const flag = isoToFlag(lastData.iso);
-      const restoreMsg = `\u3164`;
+      const restoreMsg = `📱`;
       const successMsg = await bot.sendMessage(chatId, restoreMsg, {
         parse_mode: 'Markdown',
         reply_markup: {
