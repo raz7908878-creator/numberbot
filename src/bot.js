@@ -272,6 +272,7 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
           inline_keyboard: [
             [
               { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
+              { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${range}`, style: 'success' }
             ],
             [
               { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'primary' }
@@ -301,6 +302,102 @@ async function fetchNumberForUser(chatId, range, messagesToDelete = []) {
     }
   } catch (err) {
     console.error('[fetchNumberForUser] Error:', err.message);
+    bot.sendMessage(chatId, '⚠️ A network error occurred. Please try again.').catch(() => {});
+  }
+}
+
+async function fetchMultipleNumbersForUser(chatId, range, count = 3, messagesToDelete = []) {
+  try {
+    // Unassign any previous pending number for this user immediately
+    unassignPendingForChat(chatId);
+
+    const activeApi = getActiveApi();
+    const fetchingMsg = await bot.sendMessage(chatId, `Fetching ${count} numbers, please wait...`);
+
+    let successfulNumbers = [];
+    let lastError = null;
+    const MAX_ATTEMPTS = 2;
+
+    for (let i = 0; i < count; i++) {
+      let response = null;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          if (activeApi === 'nexaotp') {
+            response = await nexaApi.getNumber(range);
+          } else if (activeApi === 'zenex') {
+            response = await zenexApi.getNumber(range);
+          } else {
+            response = await mkApi.getNumber(range);
+          }
+
+          if (response && response.status === 'success' && response.number) {
+            successfulNumbers.push(response);
+            break; // Success for this number, move to next
+          }
+
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        } catch (error) {
+          lastError = error;
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
+      }
+    }
+
+    // Delete old messages and fetching message
+    for (const msgId of messagesToDelete) {
+      try { await bot.deleteMessage(chatId, msgId); } catch (e) { /* ignore */ }
+    }
+    try { await bot.deleteMessage(chatId, fetchingMsg.message_id); } catch (e) { /* ignore */ }
+
+    // Check final result
+    if (successfulNumbers.length > 0) {
+      let message = `✅ *Success! Fetched ${successfulNumbers.length} numbers:*\n\n`;
+      let commonIso = successfulNumbers[0].iso || 'N/A';
+      
+      successfulNumbers.forEach((resp, index) => {
+        const flag = isoToFlag(resp.iso);
+        message += `${flag} *Number ${index + 1}:* \`${resp.number}\`\n`;
+      });
+      message += `\n*ISO:* ${commonIso}\n\n⏳ _Waiting for SMS..._`;
+
+      const successMsg = await bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔄 Change Number', callback_data: `change_number:${range}`, style: 'success' },
+              { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${range}`, style: 'success' }
+            ],
+            [
+              { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'primary' }
+            ]
+          ]
+        }
+      });
+
+      successfulNumbers.forEach(resp => {
+        const cleanNumber = resp.number.replace('+', '');
+        pendingNumbers[cleanNumber] = {
+          chatId: chatId,
+          range: range,
+          iso: resp.iso || '',
+          successMsgId: successMsg.message_id,
+          requestedAt: Date.now(),
+          api: activeApi,
+          numberId: resp.number_id || null
+        };
+      });
+    } else if (lastError) {
+      bot.sendMessage(chatId, `❌ Error: ${lastError.message}`).catch(() => {});
+    } else {
+      bot.sendMessage(chatId, `Failed to get numbers.`).catch(() => {});
+    }
+  } catch (err) {
+    console.error('[fetchMultipleNumbersForUser] Error:', err.message);
     bot.sendMessage(chatId, '⚠️ A network error occurred. Please try again.').catch(() => {});
   }
 }
@@ -352,6 +449,13 @@ bot.on('callback_query', async (query) => {
       bot.answerCallbackQuery(query.id).catch(() => {});
       await fetchNumberForUser(chatId, range, [oldMessageId]);
     }
+    // --- User: Change 3 numbers (from success msg) ---
+    else if (query.data.startsWith('change_3_numbers:')) {
+      const range = query.data.split(':')[1];
+      const oldMessageId = query.message.message_id;
+      bot.answerCallbackQuery(query.id).catch(() => {});
+      await fetchMultipleNumbersForUser(chatId, range, 3, [oldMessageId]);
+    }
     // --- User: Change number (from OTP msg - keep old) ---
     else if (query.data.startsWith('change_from_otp:')) {
       const range = query.data.split(':')[1];
@@ -395,6 +499,7 @@ bot.on('callback_query', async (query) => {
           inline_keyboard: [
             [
               { text: '🔄 Change Number', callback_data: `change_number:${lastData.range}`, style: 'success' },
+              { text: '🔄 Change 3 Numbers', callback_data: `change_3_numbers:${lastData.range}`, style: 'success' }
             ],
             [
               { text: '📬 OTP Group', url: 'https://t.me/srfotpgroups', style: 'primary' }
@@ -681,10 +786,8 @@ setInterval(async () => {
 
           // Skip if no NEW OTPs since restore
           if (otpCount <= knownCount) continue;
-          // Delete the old "Waiting for SMS" success message
-          if (reqData.successMsgId) {
-            try { await bot.deleteMessage(reqData.chatId, reqData.successMsgId); } catch (e) { /* ignore */ }
-          }
+
+          // (Removed deletion of success message on OTP arrival to keep initial message)
 
           // Extract only NEW OTPs (skip previously seen ones)
           const allOtps = record.otps.split('|||');
@@ -804,10 +907,8 @@ setInterval(async () => {
 
           // Skip if no NEW OTPs since restore
           if (otpCount <= knownCount) continue;
-          // Delete the old "Waiting for SMS" success message
-          if (reqData.successMsgId) {
-            try { await bot.deleteMessage(reqData.chatId, reqData.successMsgId); } catch (e) { /* ignore */ }
-          }
+
+          // (Removed deletion of success message on OTP arrival to keep initial message)
 
           // Extract only NEW OTPs (skip previously seen ones)
           const allOtps = record.otps.split('|||');
@@ -922,9 +1023,8 @@ setInterval(async () => {
           const knownCount = reqData.knownOtpCount || 0;
 
           if (otpCount <= knownCount) continue;
-          if (reqData.successMsgId) {
-            try { await bot.deleteMessage(reqData.chatId, reqData.successMsgId); } catch (e) { /* ignore */ }
-          }
+
+          // (Removed deletion of success message on OTP arrival to keep initial message)
 
           const allOtps = record.otps.split('|||');
           const allSms = (record.full_sms_list || record.otps).split('|||');
@@ -1009,8 +1109,8 @@ setInterval(async () => {
     }
   }
 
-  // 10-minute timeout: unassign numbers that haven't received OTP
-  const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+  // 20-minute timeout: unassign numbers that haven't received OTP
+  const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
   const finalNow = Date.now();
   // Re-read keys since some may have been deleted above
   for (const pNumber of Object.keys(pendingNumbers)) {
@@ -1021,7 +1121,7 @@ setInterval(async () => {
         try { await bot.deleteMessage(reqData.chatId, reqData.successMsgId); } catch (e) { /* ignore */ }
       }
       // Notify user
-      bot.sendMessage(reqData.chatId, `⏰ *Timeout!* Number \`${pNumber}\` has been unassigned after 10 minutes with no OTP.`, {
+      bot.sendMessage(reqData.chatId, `⏰ *Timeout!* Number \`${pNumber}\` has been unassigned after 20 minutes.`, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [] }
